@@ -1,3 +1,8 @@
+/*
+ * Authors: Yige Wang, Pengdi Xia
+ * Date: 1/27/2018
+ * Description: ...
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -18,8 +23,8 @@ static void doFib(int n, int doPrint);
  */
 inline static void unix_error(char *msg)
 {
-    fprintf(stdout, "%s: %s\n", msg, strerror(errno));
-    exit(1);
+   fprintf(stdout, "%s: %s\n", msg, strerror(errno));
+   exit(1);
 }
 
 
@@ -44,7 +49,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-/* 
+/*
  * Recursively compute the specified number. If print is
  * true, print it. Otherwise, provide it to my parent process.
  *
@@ -52,9 +57,40 @@ int main(int argc, char **argv)
  * a new child for each call. Each process should call
  * doFib() exactly once.
  */
+
+/*
+ * ??? parameter. returned value
+ */
+
 static void doFib(int n, int doPrint)
 {
-  
+   // Yige driving
+   if(n < 2)
+      printf("%d\n", n);
+   else{
+      int a=0;
+      int b=1;
+      int tmp;
+      pid_t fork_val = fork();
+      if (fork_val < 0){
+         fprintf(stderr, "fork error: %s/n", strerror(errno));
+	     exit(1);
+      } else if(fork_val == 0){ //child
+      // Pengdi Driving
+         tmp=b;
+         b+=a;
+         a=tmp;
+         doFib(n-1,doPrint);
+         exit(b);
+      } else{ //parent
+   int *status=NULL;
+         int result = WEXITSTATUS(status);
+      printf("%d\n",result );
+      }
+
+
+	}
+
+
+
 }
-
-
