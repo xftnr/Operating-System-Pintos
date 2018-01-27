@@ -7,6 +7,24 @@
 #include <unistd.h>
 #include "util.h"
 
+// Yige Driving
+void handler(int sig)
+{
+    ssize_t bytes;
+    const int STDOUT = 1;
+    if(sig==SIGINT){
+    bytes = write(STDOUT, "Nice try.\n", 10);
+    if(bytes != 10)
+        exit(-999);
+    }
+    // Pengdi Driving
+    else if(sig==SIGUSR1){
+        bytes = write(STDOUT, "exiting\n", 8);
+        if(bytes != 8)
+            exit(-999);
+        exit(1);
+    }
+}
 
 /*
  * First, print out the process ID of this process.
@@ -17,9 +35,35 @@
  * Finally, loop forever, printing "Still here\n" once every
  * second.
  */
+// Yige Driving
 int main(int argc, char **argv)
 {
-  return 0;
+    if(argc != 1){
+        fprintf(stderr, "Usage: ./handle\n");
+        exit(-1);
+    }
+    Signal(SIGUSR1, handler);
+    Signal(SIGINT, handler);
+    pid_t pid = getpid();
+    ssize_t bytes;
+    const int STDOUT = 1;
+    printf("%d\n", pid);
+    // ERROR!!!
+    /*bytes = write(STDOUT, &pid, sizeof(pid));
+    if(bytes != sizeof(pid))
+        exit(-999);
+    bytes = write(STDOUT, "\n", 1);
+    if(bytes != 1)
+            exit(-999);*/
+
+    struct timespec tim;
+    tim.tv_sec  = 1;
+    tim.tv_nsec = 0;
+    while(1) {
+        nanosleep(&tim, NULL);
+        bytes = write(STDOUT, "Still here\n", 11);
+        if(bytes != 11)
+            exit(-999);
+    }
+    return 0;
 }
-
-

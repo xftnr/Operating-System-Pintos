@@ -65,9 +65,9 @@ int main(int argc, char **argv)
         case 'p':             /* don't print a prompt */
             emit_prompt = 0;  /* handy for automatic testing */
 	    break;
-	default:
+        default:
             usage();
-	}
+	   }
     }
 
 
@@ -113,8 +113,8 @@ void eval(char *cmdline)
 {
     char *argv[MAXARGS];  /* Argument list execve() */
     char buf[MAXLINE];    /* Holds modified command line */
-    int bg;               /* Should hte job run in bg or fg? */
-    pid_t pid;            /* Process id */
+    int bg;               /* Should the job run in bg or fg? */
+    pid_t pid;            /* Process ID */
 
     strcpy(buf, cmdline);
     bg = parseline(buf, argv);
