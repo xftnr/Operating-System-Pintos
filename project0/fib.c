@@ -62,37 +62,42 @@ int main(int argc, char **argv)
  * ??? parameter. returned value
  */
 
-static void doFib(int n, int doPrint)
-{
-   // Yige driving
-   if(n < 2)
-      printf("%d\n", n);
-   else{
-      int a=0;
-      int b=1;
-      int tmp;
-      pid_t fork_val = fork();
-
-
-      if (fork_val < 0){
-         fprintf(stderr, "fork error: %s/n", strerror(errno));
-	     exit(1);
-      } else if(fork_val == 0){ //child
-      // Pengdi Driving
-         tmp=b;
-         b+=a;
-         a=tmp;
-         doFib(n-1,doPrint);
-         exit(b);
-      } else{ //parent
-   int *status=NULL;
-         int result = WEXITSTATUS(status);
-      printf("%d\n",result );
-      }
-
-
-	}
-
-
-
-}
+ static void doFib(int n, int doPrint)
+ {
+     // Yige driving
+    if(n < 2){
+        if(doPrint){
+            printf("%d\n", n);
+         }
+        else{
+            exit(n);
+        }
+    }
+    else{
+        pid_t pid1 = fork();
+        if (pid1 < 0){
+            fprintf(stderr, "fork error: %s/n", strerror(errno));
+            exit(1);
+        } else if(pid1 == 0){ //child
+            // Pengdi Driving
+            doFib(n-1,0);
+        } else{ //parent
+            int status1,status2;
+            int a = WEXITSTATUS(&status1);
+            int b;
+            pid_t pid2=fork();
+            if (pid2 < 0){
+                fprintf(stderr, "fork error: %s/n", strerror(errno));
+                exit(1);
+            } else if(pid2 == 0){ //child
+                doFib(n-2,0);
+            }
+            b=waitpid(pid2, &status2, WEXITSTATUS(&status2));
+            if(doPrint){
+                printf("%d\n", a+b);
+            }else{
+                exit(a+b);
+            }
+        }
+    }
+ }
