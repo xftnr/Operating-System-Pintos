@@ -72,6 +72,8 @@ static void doFib(int n, int doPrint)
       int b=1;
       int tmp;
       pid_t fork_val = fork();
+
+
       if (fork_val < 0){
          fprintf(stderr, "fork error: %s/n", strerror(errno));
 	     exit(1);

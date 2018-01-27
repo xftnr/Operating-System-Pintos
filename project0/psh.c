@@ -1,7 +1,11 @@
-/* 
+/*
  * psh - A prototype tiny shell program with job control
- * 
- * <Put your name and login ID here>
+ *
+ * Name: Yige Wang
+ * EID: yw6926
+ *
+ * Name: Pengdi Xia
+ * EID: px353
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,9 +41,9 @@ void sigquit_handler(int sig);
 
 
 /*
- * main - The shell's main routine 
+ * main - The shell's main routine
  */
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     char c;
     char cmdline[MAXLINE];
@@ -68,7 +72,7 @@ int main(int argc, char **argv)
 
 
     /* This one provides a clean way to kill the shell */
-    Signal(SIGQUIT, sigquit_handler); 
+    Signal(SIGQUIT, sigquit_handler);
 
     /* Execute the shell's read/eval loop */
     while (1) {
@@ -89,33 +93,67 @@ int main(int argc, char **argv)
 	eval(cmdline);
 	fflush(stdout);
 	fflush(stdout);
-    } 
+    }
 
     exit(0); /* control never reaches here */
 }
-  
-/* 
+
+/*
  * eval - Evaluate the command line that the user has just typed in
- * 
+ *
  * If the user has requested a built-in command (quit)
  * then execute it immediately. Otherwise, fork a child process and
  * run the job in the context of the child. If the job is running in
- * the foreground, wait for it to terminate and then return. 
+ * the foreground, wait for it to terminate and then return.
 */
-void eval(char *cmdline) 
+
+/* Code from CSAPP*/
+void eval(char *cmdline)
 {
-    return;
+   char *argv[MAXARGS];  /* Argument list execve() */
+   char buf[MAXLINE];    /* Holds modified command line */
+   int bg;               /* Should hte job run in bg or fg? */
+   pid_t pid;            /* Process id */
+
+   strcpy(buf, cmdline);
+   bg = parseline(buf, argv);
+   if(argv[0] == NULL)
+      return;            /* Ignore empty lines */
+
+   if(!builtin_cmd(argv)){
+      if((pid = fork()) == 0) {     /* Child runs user job */
+         if(execve(argv[0], argv, environ) < 0){
+            printf("%s: Command not found.\n", argv[0]);
+            exit(0);
+         }
+      }
+
+      /* Parent waits for foreground job to terminate */
+      if(!bg){
+         int status;
+         if(waitpid(pid, &status, 0) < 0)
+            unix_error("waitfg: waitpid error");
+      } else
+         printf("%d %s", pid, cmdline);
+   }
+   return;
 }
 
 
-/* 
+/*
  * builtin_cmd - If the user has typed a built-in command then execute
- *    it immediately. 
+ *    it immediately.
  * Return 1 if a builtin command was executed; return 0
  * if the argument passed in is *not* a builtin command.
  */
-int builtin_cmd(char **argv) 
+
+/* Code from CSAPP*/
+int builtin_cmd(char **argv)
 {
+   if(!strcmp(argv[0], "quit"))     /* quit command */
+      exit(0);
+   if(!strcmp(argv[0], "&"))        /* Ignore singleton */
+      return 1;
     return 0;     /* not a builtin command */
 }
 
@@ -130,7 +168,7 @@ int builtin_cmd(char **argv)
 /*
  * usage - print a help message
  */
-void usage(void) 
+void usage(void)
 {
     printf("Usage: shell [-hvp]\n");
     printf("   -h   print this message\n");
@@ -143,15 +181,12 @@ void usage(void)
  * sigquit_handler - The driver program can gracefully terminate the
  *    child shell by sending it a SIGQUIT signal.
  */
-void sigquit_handler(int sig) 
+void sigquit_handler(int sig)
 {
-    ssize_t bytes; 
-    const int STDOUT = 1; 
-    bytes = write(STDOUT, "Terminating after receipt of SIGQUIT signal\n", 45); 
-    if(bytes != 45) 
+    ssize_t bytes;
+    const int STDOUT = 1;
+    bytes = write(STDOUT, "Terminating after receipt of SIGQUIT signal\n", 45);
+    if(bytes != 45)
        exit(-999);
     exit(1);
 }
-
-
-
