@@ -1,6 +1,6 @@
-/* 
+/*
  * msh - A mini shell program with job control
- * 
+ *
  * <Put your name and login ID here>
  */
 #include <stdio.h>
@@ -44,9 +44,9 @@ void sigquit_handler(int sig);
 
 
 /*
- * main - The shell's main routine 
+ * main - The shell's main routine
  */
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     char c;
     char cmdline[MAXLINE];
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     Signal(SIGCHLD, sigchld_handler);  /* Terminated or stopped child */
 
     /* This one provides a clean way to kill the shell */
-    Signal(SIGQUIT, sigquit_handler); 
+    Signal(SIGQUIT, sigquit_handler);
 
     /* Initialize the job list */
     initjobs(jobs);
@@ -105,48 +105,108 @@ int main(int argc, char **argv)
 	eval(cmdline);
 	fflush(stdout);
 	fflush(stdout);
-    } 
+    }
 
     exit(0); /* control never reaches here */
 }
-  
-/* 
+
+/*
  * eval - Evaluate the command line that the user has just typed in
- * 
+ *
  * If the user has requested a built-in command (quit, jobs, bg or fg)
  * then execute it immediately. Otherwise, fork a child process and
  * run the job in the context of the child. If the job is running in
  * the foreground, wait for it to terminate and then return.  Note:
  * each child process must have a unique process group ID so that our
  * background children don't receive SIGINT (SIGTSTP) from the kernel
- * when we type ctrl-c (ctrl-z) at the keyboard.  
+ * when we type ctrl-c (ctrl-z) at the keyboard.
 */
-void eval(char *cmdline) 
+
+// Yige driving
+void eval(char *cmdline)
 {
+
+    char *argv[MAXARGS];  /* Argument list execve() */
+    char buf[MAXLINE];    /* Holds modified command line */
+    int bg;               /* Should the job run in bg or fg? */
+    pid_t pid;            /* Process ID */
+
+    strcpy(buf, cmdline);
+    bg = parseline(buf, argv);
+    if(argv[0] == NULL)
+    return;            /* Ignore empty lines */
+
+    if(!builtin_cmd(argv)){
+        if((pid = fork()) == 0) {     /* Child runs user job */
+            setpgid(pid, pid);
+          if(execve(argv[0], argv, environ) < 0){
+             printf("%s: Command not found.\n", argv[0]);
+             exit(0);
+          }
+       }
+
+       /* Parent waits for foreground job to terminate */
+       if(!bg){
+          int status;
+          if(waitpid(pid, &status, 0) < 0)
+             unix_error("waitfg: waitpid error");
+       } else
+          printf("%d %s", pid, cmdline);
+    }
     return;
 }
 
 
-/* 
+/*
  * builtin_cmd - If the user has typed a built-in command then execute
- *    it immediately.  
+ *    it immediately.
  * Return 1 if a builtin command was executed; return 0
  * if the argument passed in is *not* a builtin command.
  */
-int builtin_cmd(char **argv) 
+int builtin_cmd(char **argv)
 {
+
+    if(!strcmp(argv[0], "quit"))     /* quit command */
+       exit(0);
+    if(!strcmp(argv[0], "fg")) {   /* fg command */
+        do_bgfg(argv);
+        return 1;
+    }
+
+    if(!strcmp(argv[0], "bg")){   /* bg command */
+        do_bgfg(argv);
+        return 1;
+    }
+    if(!strcmp(argv[0], "jobs")) {        /* jobs command */
+        int i;
+
+        for (i = 0; i < MAXJOBS; i++) {
+            if (jobs[i].pid != 0 && jobs[i].state == BG) {
+                printf("[%d] (%d) Running ", jobs[i].jid, jobs[i].pid);
+    	    }
+    	    printf("%s", jobs[i].cmdline);
+    	}
+       return 1;
+    }
+
+    if(!strcmp(argv[0], "&")) {        /* Ignore singleton */
+
+       return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
-/* 
+
+/*
  * do_bgfg - Execute the builtin bg and fg commands
  */
-void do_bgfg(char **argv) 
+void do_bgfg(char **argv)
 {
+
     return;
 }
 
-/* 
+/*
  * waitfg - Block until process pid is no longer the foreground process
  */
 void waitfg(pid_t pid)
@@ -158,24 +218,24 @@ void waitfg(pid_t pid)
  * Signal handlers
  *****************/
 
-/* 
+/*
  * sigchld_handler - The kernel sends a SIGCHLD to the shell whenever
  *     a child job terminates (becomes a zombie), or stops because it
  *     received a SIGSTOP or SIGTSTP signal. The handler reaps all
  *     available zombie children, but doesn't wait for any other
- *     currently running children to terminate.  
+ *     currently running children to terminate.
  */
-void sigchld_handler(int sig) 
+void sigchld_handler(int sig)
 {
     return;
 }
 
-/* 
+/*
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
  *    user types ctrl-c at the keyboard.  Catch it and send it along
- *    to the foreground job.  
+ *    to the foreground job.
  */
-void sigint_handler(int sig) 
+void sigint_handler(int sig)
 {
     return;
 }
@@ -183,9 +243,9 @@ void sigint_handler(int sig)
 /*
  * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
  *     the user types ctrl-z at the keyboard. Catch it and suspend the
- *     foreground job by sending it a SIGTSTP.  
+ *     foreground job by sending it a SIGTSTP.
  */
-void sigtstp_handler(int sig) 
+void sigtstp_handler(int sig)
 {
     return;
 }
@@ -203,7 +263,7 @@ void sigtstp_handler(int sig)
 /*
  * usage - print a help message
  */
-void usage(void) 
+void usage(void)
 {
     printf("Usage: shell [-hvp]\n");
     printf("   -h   print this message\n");
@@ -216,7 +276,7 @@ void usage(void)
  * sigquit_handler - The driver program can gracefully terminate the
  *    child shell by sending it a SIGQUIT signal.
  */
-void sigquit_handler(int sig) 
+void sigquit_handler(int sig)
 {
     ssize_t bytes;
     const int STDOUT = 1;
@@ -225,6 +285,3 @@ void sigquit_handler(int sig)
        exit(-999);
     exit(1);
 }
-
-
-
