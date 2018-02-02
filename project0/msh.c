@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 */
 
 // Yige driving
-void eval(char *cmdline)
+void eval(char *cmdline)//add job plz
 {
 
     char *argv[MAXARGS];  /* Argument list execve() */
@@ -139,19 +139,19 @@ void eval(char *cmdline)
     if(!builtin_cmd(argv)){
         if((pid = fork()) == 0) {     /* Child runs user job */
             setpgid(pid, pid);
-          if(execve(argv[0], argv, environ) < 0){
-             printf("%s: Command not found.\n", argv[0]);
-             exit(0);
-          }
-       }
+            if(execve(argv[0], argv, environ) < 0){
+                printf("%s: Command not found.\n", argv[0]);
+                exit(0);
+            }
+        }
 
        /* Parent waits for foreground job to terminate */
-       if(!bg){
-          int status;
-          if(waitpid(pid, &status, 0) < 0)
-             unix_error("waitfg: waitpid error");
-       } else
-          printf("%d %s", pid, cmdline);
+        if(!bg){
+            int status;
+            if(waitpid(pid, &status, 0) < 0)
+                unix_error("waitfg: waitpid error");
+        } else
+            printf("%d %s", pid, cmdline);
     }
     return;
 }
@@ -167,7 +167,7 @@ int builtin_cmd(char **argv)
 {
 
     if(!strcmp(argv[0], "quit"))     /* quit command */
-       exit(0);
+        exit(0);
     if(!strcmp(argv[0], "fg")) {   /* fg command */
         do_bgfg(argv);
         return 1;
@@ -183,15 +183,14 @@ int builtin_cmd(char **argv)
         for (i = 0; i < MAXJOBS; i++) {
             if (jobs[i].pid != 0 && jobs[i].state == BG) {
                 printf("[%d] (%d) Running ", jobs[i].jid, jobs[i].pid);
-    	    }
-    	    printf("%s", jobs[i].cmdline);
-    	}
-       return 1;
+            }
+            printf("%s", jobs[i].cmdline);
+        }
+        return 1;
     }
 
     if(!strcmp(argv[0], "&")) {        /* Ignore singleton */
-
-       return 1;
+        return 1;
     }
     return 0;     /* not a builtin command */
 }
@@ -202,15 +201,26 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv)
 {
-
-    return;
+     char *id = argv[1];
+     pid_t pid;
+     if(id[0] == '%')
+        pid = atoi(id++);
+     else
+        pid = atoi(id);
+     if(!strcmp(argv[0], "fg")){   /* fg command */
+         struct job_t *currjob= getjobjid(jobs,pid);
+         currjob->state=FG;
+     }
+     kill(pid, SIGCONT);
+     return;
 }
 
 /*
- * waitfg - Block until process pid is no longer the foreground process
- */
+* waitfg - Block until process pid is no longer the foreground process
+*/
 void waitfg(pid_t pid)
 {
+
     return;
 }
 
