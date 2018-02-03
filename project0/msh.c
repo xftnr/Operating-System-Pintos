@@ -137,21 +137,38 @@ void eval(char *cmdline)//add job plz
     return;            /* Ignore empty lines */
 
     if(!builtin_cmd(argv)){
-        if((pid = fork()) == 0) {     /* Child runs user job */
+        sigset_t mask, prevmask;
+        sigemptyset(&mask);
+        sigaddset(&mask,SIGCHLD);
+        sigprocmask(SIG_BLOCK,&mask, &prevmask);
+        pid = fork();
+        if (pid < 0){
+            fprintf(stderr, "fork error: %s/n", strerror(errno));
+            exit(1);
+        }
+
+        else if(pid == 0) {     /* Child runs user job */
             setpgid(pid, pid);
+            sigprocmask(SIG_UNBLOCK,&mask, &prevmask);
             if(execve(argv[0], argv, environ) < 0){
                 printf("%s: Command not found.\n", argv[0]);
                 exit(0);
             }
         }
+        else{
+        //check state--stopped
+        if(!bg){
+            addjob(jobs, pid, FG, cmdline);
+            waitfg(pid);
+        } else{
+            addjob(jobs, pid, BG, cmdline);
+            printf("%d %s", pid, cmdline);
+        }
+        sigprocmask(SIG_UNBLOCK,&mask, &prevmask);
+}
 
        /* Parent waits for foreground job to terminate */
-        if(!bg){
-            int status;
-            if(waitpid(pid, &status, 0) < 0)
-                unix_error("waitfg: waitpid error");
-        } else
-            printf("%d %s", pid, cmdline);
+
     }
     return;
 }
@@ -178,14 +195,7 @@ int builtin_cmd(char **argv)
         return 1;
     }
     if(!strcmp(argv[0], "jobs")) {        /* jobs command */
-        int i;
-
-        for (i = 0; i < MAXJOBS; i++) {
-            if (jobs[i].pid != 0 && jobs[i].state == BG) {
-                printf("[%d] (%d) Running ", jobs[i].jid, jobs[i].pid);
-            }
-            printf("%s", jobs[i].cmdline);
-        }
+        listjobs(jobs);
         return 1;
     }
 
@@ -199,27 +209,46 @@ int builtin_cmd(char **argv)
 /*
  * do_bgfg - Execute the builtin bg and fg commands
  */
-void do_bgfg(char **argv)
-{
+// Pengdi driving
+ void do_bgfg(char **argv)
+ {
      char *id = argv[1];
+     int jid;
      pid_t pid;
-     if(id[0] == '%')
-        pid = atoi(id++);
-     else
-        pid = atoi(id);
-     if(!strcmp(argv[0], "fg")){   /* fg command */
-         struct job_t *currjob= getjobjid(jobs,pid);
-         currjob->state=FG;
+     struct job_t *currjob;
+     if(id[0] == '%'){
+         jid = atoi(id++);
+         currjob= getjobjid(jobs,jid);
      }
-     kill(pid, SIGCONT);
+     else{
+         pid = atoi(id);
+         currjob= getjobpid(jobs,pid);
+     }
+     if(!strcmp(argv[0], "bg")){   /* fg command */
+         kill(currjob->pid, SIGCONT);
+         currjob->state=BG;
+         printf("[%d] (%d) %s",currjob->jid, currjob->pid, currjob->cmdline);
+     }
+     else{
+         kill(currjob->pid, SIGCONT);
+         currjob->state=FG;
+         waitfg(currjob->pid);
+     }
      return;
-}
+ }
 
 /*
 * waitfg - Block until process pid is no longer the foreground process
 */
 void waitfg(pid_t pid)
 {
+    sigset_t mask, prevmask;
+    sigemptyset(&mask);
+    sigaddset(&mask,SIGCHLD);
+    sigprocmask(SIG_BLOCK,&mask, &prevmask);
+    while(fgpid(jobs)==pid){
+        sigsuspend(&prevmask);
+    }
 
     return;
 }
@@ -237,6 +266,7 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig)
 {
+//use waitpid to decode status
     return;
 }
 
@@ -245,18 +275,31 @@ void sigchld_handler(int sig)
  *    user types ctrl-c at the keyboard.  Catch it and send it along
  *    to the foreground job.
  */
+// Yige driving
 void sigint_handler(int sig)
 {
+    if(fgpid(jobs) == 0) {
+        fprintf(stderr, "no foreground job\n");
+        exit(1);
+    }
+    if(kill(fgpid(jobs), sig) == -1)
+        fprintf(stderr, "kill error: %s\n", strerror(errno));
     return;
 }
 
 /*
- * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
- *     the user types ctrl-z at the keyboard. Catch it and suspend the
- *     foreground job by sending it a SIGTSTP.
- */
+* sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
+*     the user types ctrl-z at the keyboard. Catch it and suspend the
+*     foreground job by sending it a SIGTSTP.
+*/
 void sigtstp_handler(int sig)
 {
+    if(fgpid(jobs) == 0) {
+        fprintf(stderr, "no foreground job\n");
+        exit(1);
+    }
+    if(kill(fgpid(jobs), sig) == -1)
+        fprintf(stderr, "kill error: %s\n", strerror(errno));
     return;
 }
 

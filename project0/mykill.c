@@ -6,6 +6,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string.h>
+
 // Pengdi Driving
 int main(int argc, char **argv)
 {
@@ -15,6 +17,9 @@ int main(int argc, char **argv)
     }
     pid_t pid;
     pid = atoi(argv[1]);
-    kill(pid, SIGUSR1);
+    if(kill(pid, SIGUSR1)==-1){
+        fprintf(stderr, "kill error: %s\n", strerror(errno));
+        exit(1);
+    }
     return 0;
 }

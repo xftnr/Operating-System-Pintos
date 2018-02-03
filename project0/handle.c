@@ -45,22 +45,19 @@ int main(int argc, char **argv)
     Signal(SIGUSR1, handler);
     Signal(SIGINT, handler);
     pid_t pid = getpid();
+
     ssize_t bytes;
     const int STDOUT = 1;
     printf("%d\n", pid);
-    // ERROR!!!
-    /*bytes = write(STDOUT, &pid, sizeof(pid));
-    if(bytes != sizeof(pid))
-        exit(-999);
-    bytes = write(STDOUT, "\n", 1);
-    if(bytes != 1)
-            exit(-999);*/
 
     struct timespec tim;
-    tim.tv_sec  = 1;
-    tim.tv_nsec = 0;
+    struct timespec rem;
     while(1) {
-        nanosleep(&tim, NULL);
+        tim.tv_sec  = 1;
+        tim.tv_nsec = 0;
+        while(nanosleep(&tim, &rem)==-1){
+            tim=rem;
+        }
         bytes = write(STDOUT, "Still here\n", 11);
         if(bytes != 11)
             exit(-999);

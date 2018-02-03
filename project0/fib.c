@@ -83,7 +83,9 @@ int main(int argc, char **argv)
             doFib(n-1,0);
         } else{ //parent
             int status1,status2;
-            waitpid(pid1, &status1, 0);
+            if(waitpid(pid1, &status1, 0)<0){
+                unix_error("waitfg: waitpid error");
+            }
             int a = WEXITSTATUS(status1);
             int b;
             pid_t pid2=fork();
@@ -93,7 +95,9 @@ int main(int argc, char **argv)
             } else if(pid2 == 0){ //child
                 doFib(n-2,0);
             }
-            waitpid(pid2, &status2, 0);
+            if(waitpid(pid2, &status2, 0)<0){
+                unix_error("waitfg: waitpid error");
+            }
             b=WEXITSTATUS(status2);
             if(doPrint){
                 printf("%d\n", a+b);
