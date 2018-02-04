@@ -5,21 +5,31 @@
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
-
+#include "util.h"
 #include <string.h>
+
+/*
+ *Function: mykill
+ *-----------------
+ *kill the running function by passby pid send the signal by kill.
+ *
+ *arge: >2
+ *argV: commandline and contain the pid
+ *
+ */
 
 // Pengdi Driving
 int main(int argc, char **argv)
 {
+    pid_t pid;      /* Process ID */
+    // check precondition
     if(argc != 2){
-        fprintf(stderr, "Usage: ./mykill <num>\n");
-        exit(-1);
+        unix_error("mykill: input error");
     }
-    pid_t pid;
     pid = atoi(argv[1]);
+    // send the signal and check the system call
     if(kill(pid, SIGUSR1)==-1){
-        fprintf(stderr, "kill error: %s\n", strerror(errno));
-        exit(1);
+        unix_error("mykill: kill error");
     }
     return 0;
 }

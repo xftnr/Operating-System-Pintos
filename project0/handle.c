@@ -7,12 +7,27 @@
 #include <unistd.h>
 #include "util.h"
 
+
+/*
+ *Function: handler
+ *-----------------
+ *handle two kind of the signal: sigint and siguser1
+ *sigint will not exit process only print nice try.
+ *siguser1 will exit the process and print exiting.
+ *
+ *sig: send the signal
+ *
+*/
+
 // Yige Driving
 void handler(int sig)
 {
     ssize_t bytes;
     const int STDOUT = 1;
+    //handle sigint
     if(sig==SIGINT){
+    /*the handler have to use the write function to print,
+    *because the printf function will interrupted by the signals. */
     bytes = write(STDOUT, "Nice try.\n", 10);
     if(bytes != 10)
         exit(-999);
@@ -38,29 +53,28 @@ void handler(int sig)
 // Yige Driving
 int main(int argc, char **argv)
 {
+    // set of variables
+    pid_t pid;
+    struct timespec tim;
+    struct timespec rem;
     if(argc != 1){
         fprintf(stderr, "Usage: ./handle\n");
         exit(-1);
     }
+    //send the signal
     Signal(SIGUSR1, handler);
     Signal(SIGINT, handler);
-    pid_t pid = getpid();
-
-    ssize_t bytes;
-    const int STDOUT = 1;
+    pid = getpid();
     printf("%d\n", pid);
-
-    struct timespec tim;
-    struct timespec rem;
     while(1) {
+        //set up the nanosleep by 1 second
         tim.tv_sec  = 1;
         tim.tv_nsec = 0;
+        //when process interrupted in middle, starts from the remaining time.
         while(nanosleep(&tim, &rem)==-1){
             tim=rem;
         }
-        bytes = write(STDOUT, "Still here\n", 11);
-        if(bytes != 11)
-            exit(-999);
+        printf("Still here\n");
     }
     return 0;
 }

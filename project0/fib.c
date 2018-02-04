@@ -1,8 +1,8 @@
 /*
- * Authors: Yige Wang, Pengdi Xia
- * Date: 1/27/2018
- * Description: ...
- */
+* Authors: Yige Wang, Pengdi Xia
+* Date: 1/27/2018
+* Description: ...
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -19,12 +19,12 @@ static void doFib(int n, int doPrint);
 
 
 /*
- * unix_error - unix-style error routine.
- */
+* unix_error - unix-style error routine.
+*/
 inline static void unix_error(char *msg)
 {
-   fprintf(stdout, "%s: %s\n", msg, strerror(errno));
-   exit(1);
+    fprintf(stdout, "%s: %s\n", msg, strerror(errno));
+    exit(1);
 }
 
 
@@ -50,44 +50,58 @@ int main(int argc, char **argv)
 }
 
 /*
- * Recursively compute the specified number. If print is
- * true, print it. Otherwise, provide it to my parent process.
- *
- * NOTE: The solution must be recursive and it must fork
- * a new child for each call. Each process should call
- * doFib() exactly once.
- */
+* Recursively compute the specified number. If print is
+* true, print it. Otherwise, provide it to my parent process.
+*
+* NOTE: The solution must be recursive and it must fork
+* a new child for each call. Each process should call
+* doFib() exactly once.
+*/
 
 /*
- * ??? parameter. returned value
- */
+* Function: doFib
+* -----------------
+* compute the fibonacci by the recursive f(x)= f(x-1)+f(x)
+* aternatively we use the fork() function by exit status
+*
+* n: index of the fibonacci
+* doPrint: boolean to decide print the result
+*
+* returns: the nth fibonacci result.
+*/
 
- static void doFib(int n, int doPrint)
- {
-     // Yige driving
+static void doFib(int n, int doPrint)
+{
+    // set of veriables
+    pid_t pid1,pid2;
+    int status1,status2, result1, result2;
+    // Yige driving
+    // base case when index is 0 or 1 the value is 0 and 1
     if(n < 2){
         if(doPrint){
             printf("%d\n", n);
-         }
+        }
+        //exit the the child status for recursive add
         else{
             exit(n);
         }
     }
+    //general case
     else{
-        pid_t pid1 = fork();
+        pid1 = fork();
         if (pid1 < 0){
             unix_error("doFib: fork error");
         } else if(pid1 == 0){ //child
             // Pengdi Driving
             doFib(n-1,0);
         } else { //parent
-            int status1,status2;
             if(waitpid(pid1, &status1, 0)<0){
                 unix_error("waitfg: waitpid error");
             }
-            int a = WEXITSTATUS(status1);
-            int b;
-            pid_t pid2=fork();
+            // store the first result
+            result1 = WEXITSTATUS(status1);
+            //parent create the second fork to check x-2
+            pid2=fork();
             if (pid2 < 0){
                 unix_error("doFib: fork error");
             } else if(pid2 == 0){ //child
@@ -96,12 +110,13 @@ int main(int argc, char **argv)
             if(waitpid(pid2, &status2, 0)<0){
                 unix_error("waitfg: waitpid error");
             }
-            b=WEXITSTATUS(status2);
+            //store the second result and do compute
+            result2=WEXITSTATUS(status2);
             if(doPrint){
-                printf("%d\n", a+b);
+                printf("%d\n", result1+result2);
             }else{
-                exit(a+b);
+                exit(result1+result2);
             }
         }
     }
- }
+}
