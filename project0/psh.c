@@ -122,20 +122,25 @@ void eval(char *cmdline)
        return;            /* Ignore empty lines */
 
     if(!builtin_cmd(argv)){
-       if((pid = fork()) == 0) {     /* Child runs user job */
-          if(execve(argv[0], argv, environ) < 0){
-             printf("%s: Command not found.\n", argv[0]);
-             exit(0);
-          }
-       }
-
-       /* Parent waits for foreground job to terminate */
-       if(!bg){
-          int status;
-          if(waitpid(pid, &status, 0) < 0)
-             unix_error("waitfg: waitpid error");
-       } else
-          printf("%d %s", pid, cmdline);
+        pid = fork();
+        if (pid < 0){
+            unix_error("eval: fork error");
+        } else if(pid == 0){     /* Child runs user job */
+            if(execve(argv[0], argv, environ) < 0){
+                printf("%s: Command not found.\n", argv[0]);
+                exit(0); // why exit with 0 when there is a execve() error???
+            }
+        } else{
+            /* Parent waits for foreground job to terminate */
+            if(!bg){
+                int status;
+                if(waitpid(pid, &status, 0) < 0) {
+                    unix_error("waitfg: waitpid error");
+                }
+            } else{
+                printf("%d %s", pid, cmdline);
+            }
+        }
     }
     return;
 }

@@ -138,37 +138,43 @@ void eval(char *cmdline)//add job plz
 
     if(!builtin_cmd(argv)){
         sigset_t mask, prevmask;
-        sigemptyset(&mask);
-        sigaddset(&mask,SIGCHLD);
-        sigprocmask(SIG_BLOCK,&mask, &prevmask);
-        pid = fork();
-        if (pid < 0){
-            fprintf(stderr, "fork error: %s\n", strerror(errno));
-            exit(1);
+        if(sigemptyset(&mask) < 0){
+            unix_error("eval: sigemptyset error");
         }
-
-        else if(pid == 0) {     /* Child runs user job */
+        if(sigaddset(&mask,SIGCHLD) < 0) {
+            unix_error("eval: sigaddset error");
+        }
+        if(sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ){
+            unix_error("eval: sigprocmask error");
+        }
+        pid = fork();
+        if(pid < 0){
+            unix_error("eval: fork error");
+        }else if(pid == 0){     /* Child runs user job */
             setpgid(pid, pid);
-            sigprocmask(SIG_UNBLOCK,&mask, &prevmask);
+            if(sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ){
+                unix_error("eval: sigprocmask error");
+            }
             if(execve(argv[0], argv, environ) < 0){
                 printf("%s: Command not found.\n", argv[0]);
                 exit(0);
             }
-        }
-        else{
+        }else{
             //check state--stopped
             if(!bg){
                 addjob(jobs, pid, FG, cmdline);
+                if(sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ){
+                    unix_error("eval: sigprocmask error");
+                }
                 waitfg(pid);
             } else{
                 addjob(jobs, pid, BG, cmdline);
                 printf("[%d] (%d) %s\n",pid2jid(jobs, pid), pid, cmdline);
+                if(sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ){
+                    unix_error("eval: sigprocmask error");
+                }
             }
-            sigprocmask(SIG_UNBLOCK,&mask, &prevmask);
         }
-
-        /* Parent waits for foreground job to terminate */
-
     }
     return;
 }
@@ -264,11 +270,11 @@ void waitfg(pid_t pid)
     sigset_t mask, prevmask;
     sigemptyset(&mask);
     sigaddset(&mask,SIGCHLD);
-    sigprocmask(SIG_BLOCK,&mask, &prevmask);
+    sigprocmask(SIG_BLOCK, &mask, &prevmask);
     while(fgpid(jobs)==pid){
         sigsuspend(&prevmask);
     }
-
+    sigprocmask(SIG_UNBLOCK, &mask, &prevmask);
     return;
 }
 
@@ -285,24 +291,43 @@ void waitfg(pid_t pid)
 */
 void sigchld_handler(int sig)
 {
-    //use waitpid to decode status
-    for(int i = 1; i <= maxjid(jobs); i++) {
-        struct job_t *job = getjobjid(jobs, i);
-        if(job->state != UNDEF) {
-            int status;
-            waitpid(job->pid, &status, WNOHANG|WUNTRACED);
-            if(WIFSIGNALED(status)) { //???
-                deletejob(jobs, job->pid);
-                printf("Job [%d] (%d) terminated by uncaught signal\n", job->jid, job->pid);
-            } else if (WIFEXITED(status)) {
-                deletejob(jobs, job->pid);
-            } else if (WIFSTOPPED(status)) {
-                job->state = ST;
-                printf("Job [%d] (%d) stopped by uncaught signal\n", job->jid, job->pid);
-            }
+    int status;
+    pid_t pid;
+    sigset_t mask_all, prev_all;
+    sigfillset(&mask_all);
+    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED))> 0) {
+
+        struct job_t *job = getjobpid(jobs, pid);
+        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        if(WIFSIGNALED(status)) { //???
+            deletejob(jobs, job->pid);
+            printf("Job [%d] (%d) terminated by uncaught signal\n", job->jid, job->pid);
+        } else if (WIFEXITED(status)) {
+            deletejob(jobs, job->pid);
+        } else if (WIFSTOPPED(status)) {
+            job->state = ST;
+            printf("Job [%d] (%d) stopped by uncaught signal\n", job->jid, job->pid);
         }
-        //handle uncaught signal
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
+    //use waitpid to decode status
+    // for(int i = 1; i <= maxjid(jobs); i++) {
+    //     struct job_t *job = getjobjid(jobs, i);
+    //     if(job->state != UNDEF) {
+    //         int status;
+    //         waitpid(job->pid, &status, WNOHANG|WUNTRACED);
+    //         if(WIFSIGNALED(status)) { //???
+    //             deletejob(jobs, job->pid);
+    //             printf("Job [%d] (%d) terminated by uncaught signal\n", job->jid, job->pid);
+    //         } else if (WIFEXITED(status)) {
+    //             deletejob(jobs, job->pid);
+    //         } else if (WIFSTOPPED(status)) {
+    //             job->state = ST;
+    //             printf("Job [%d] (%d) stopped by uncaught signal\n", job->jid, job->pid);
+    //         }
+    //     }
+        //handle uncaught signal
+    // }
     return;
 }
 
@@ -319,11 +344,15 @@ void sigint_handler(int sig)
         exit(1);
     }
     struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
-    if(kill(fgpid(jobs), sig) == -1)
-    fprintf(stderr, "kill error: %s\n", strerror(errno));
-    else {
+    if(kill(fgpid(jobs), sig) == -1) {
+        fprintf(stderr, "kill error: %s\n", strerror(errno));
+    } else {
+        sigset_t mask_all, prev_all;
+        sigfillset(&mask_all);
+        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         deletejob(jobs, currjob->pid);
         printf("Job [%d] (%d) terminated by signal %d\n", currjob->jid, currjob->pid, sig);
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
     return;
 }
@@ -340,11 +369,15 @@ void sigtstp_handler(int sig)
         exit(1);
     }
     struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
-    if(kill(fgpid(jobs), sig) == -1)
-    fprintf(stderr, "kill error: %s\n", strerror(errno));
-    else {
+    if(kill(fgpid(jobs), sig) == -1) {
+        fprintf(stderr, "kill error: %s\n", strerror(errno));
+    }else {
+        sigset_t mask_all, prev_all;
+        sigfillset(&mask_all);
+        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         currjob->state = ST;
         printf("Job [%d] (%d) stopped by signal %d\n", currjob->jid, currjob->pid, sig);
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
     return;
 }

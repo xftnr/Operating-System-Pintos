@@ -76,12 +76,11 @@ int main(int argc, char **argv)
     else{
         pid_t pid1 = fork();
         if (pid1 < 0){
-            fprintf(stderr, "fork error: %s/n", strerror(errno));
-            exit(1);
+            unix_error("doFib: fork error");
         } else if(pid1 == 0){ //child
             // Pengdi Driving
             doFib(n-1,0);
-        } else{ //parent
+        } else { //parent
             int status1,status2;
             if(waitpid(pid1, &status1, 0)<0){
                 unix_error("waitfg: waitpid error");
@@ -90,8 +89,7 @@ int main(int argc, char **argv)
             int b;
             pid_t pid2=fork();
             if (pid2 < 0){
-                fprintf(stderr, "fork error: %s/n", strerror(errno));
-                exit(1);
+                unix_error("doFib: fork error");
             } else if(pid2 == 0){ //child
                 doFib(n-2,0);
             }
