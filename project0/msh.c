@@ -227,6 +227,9 @@ void do_bgfg(char **argv)
         return;
     }
     // char *id = argv[1];
+    sigset_t mask_all, prev_all;
+    sigfillset(&mask_all);
+    sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
     int jid;
     pid_t pid;
     struct job_t *currjob=NULL;
@@ -248,19 +251,21 @@ void do_bgfg(char **argv)
         }
         pid = atoi(argv[1]);
         if(getjobpid(jobs,pid)==NULL) {
-            printf("(%d): No such job\n", pid);
+            printf("(%d): No such process\n", pid);
             return;
         }
         currjob = getjobpid(jobs, pid);
     }
-    if(!strcmp(argv[0], "bg")){   /* fg command */
-        kill(currjob->pid, SIGCONT);
+    if(!strcmp(argv[0], "bg")){   /* bg command */
+        kill(-(currjob->pid), SIGCONT);
         currjob->state=BG;
-        printf("[%d] (%d) %s\n",currjob->jid, currjob->pid, currjob->cmdline);
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        printf("[%d] (%d) %s",currjob->jid, currjob->pid, currjob->cmdline);
     }
-    else{
-        kill(currjob->pid, SIGCONT);
+    else if (!strcmp(argv[0], "fg")){
+        kill(-(currjob->pid), SIGCONT);
         currjob->state=FG;
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
         waitfg(currjob->pid);
     }
     return;
@@ -299,24 +304,30 @@ void sigchld_handler(int sig)
     pid_t pid;
     ssize_t bytes;
     const int STDOUT = 1;
-    char str[1024];
+    char str[80];
     sigset_t mask_all, prev_all;
     sigfillset(&mask_all);
-    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED))> 0) {
+    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) {
         struct job_t *job = getjobpid(jobs, pid);
         sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         if(WIFSIGNALED(status)) { //???
             sprintf(str, "Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, WTERMSIG(status));
-            bytes = write(STDOUT, str, sizeof(str));
-            if(bytes != sizeof(str)){
+            bytes = write(STDOUT, str, strlen(str));
+            if(bytes != strlen(str)){
                 exit(-999);
             }
+            // printf("Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, WTERMSIG(status));
             deletejob(jobs, job->pid);
-        } else if (WIFEXITED(status)) {
+        } else if(WIFEXITED(status)) {
             deletejob(jobs, job->pid);
-        // } else if (WIFSTOPPED(status)&&WSTOPSIG(status)!=SIGTSTP) {
-        //     job->state = ST;
-        //     printf("Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, WSTOPSIG(status));
+        }else if (WIFSTOPPED(status)) {
+            sprintf(str, "Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, WSTOPSIG(status));
+            bytes = write(STDOUT, str, strlen(str));
+            if(bytes != strlen(str)){
+                exit(-999);
+            }
+            // printf("Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, WSTOPSIG(status));
+            job->state = ST;
         }
         sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
@@ -349,28 +360,36 @@ void sigchld_handler(int sig)
 // Yige driving
 void sigint_handler(int sig)
 {
-    ssize_t bytes;
-    const int STDOUT = 1;
-    char str[1024];
-    if(fgpid(jobs) == 0) {
-        fprintf(stderr, "no foreground job\n");
+    // ssize_t bytes;
+    // const int STDOUT = 1;
+    // char str[80];
+    // if(fgpid(jobs) == 0) {
+    //     fprintf(stderr, "no foreground job\n");
+    //     return;
+    // }
+    // struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
+    // if(kill(fgpid(jobs), sig) == -1) {
+    //     fprintf(stderr, "kill error: %s\n", strerror(errno));
+    // } else {
+    //     sigset_t mask_all, prev_all;
+    //     sigfillset(&mask_all);
+    //     sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    //     // sprintf(str, "Job [%d] (%d) terminated by signal %d\n", currjob->jid, currjob->pid, sig);
+    //     // bytes = write(STDOUT, str, sizeof(str));
+    //     // if(bytes != sizeof(str)){
+    //     //     exit(-999);
+    //     // }
+    //     printf("Job [%d] (%d) terminated by signal %d\n", currjob->jid, currjob->pid, sig);
+    //     deletejob(jobs, currjob->pid);
+    //     sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+    // }
+    if(fgpid(jobs) == 0) { //no foreground job, do nothing
         return;
     }
-    struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
-    if(kill(fgpid(jobs), sig) == -1) {
-        fprintf(stderr, "kill error: %s\n", strerror(errno));
-    } else {
-        sigset_t mask_all, prev_all;
-        sigfillset(&mask_all);
-        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-        sprintf(str, "Job [%d] (%d) terminated by signal %d\n", currjob->jid, currjob->pid, sig);
-        bytes = write(STDOUT, str, sizeof(str));
-        if(bytes != sizeof(str)){
-            exit(-999);
-        }
-        deletejob(jobs, currjob->pid);
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
-    }
+    // if(kill(-fgpid(jobs), sig) < 0) {
+    //     unix_error("sigint_handler: kill error");
+    // }
+    kill(-fgpid(jobs), sig);
     return;
 }
 
@@ -381,28 +400,37 @@ void sigint_handler(int sig)
 */
 void sigtstp_handler(int sig)
 {
-    ssize_t bytes;
-    const int STDOUT = 1;
-    char str[1024];
-    if(fgpid(jobs) == 0) {
-        fprintf(stderr, "no foreground job\n");
+    // ssize_t bytes;
+    // const int STDOUT = 1;
+    // char str[80];
+    // if(fgpid(jobs) == 0) {
+    //     fprintf(stderr, "no foreground job\n");
+    //     return;
+    // }
+    // struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
+    // if(kill(fgpid(jobs), sig) == -1) {
+    //     fprintf(stderr, "kill error: %s\n", strerror(errno));
+    // }else {
+    //     sigset_t mask_all, prev_all;
+    //     sigfillset(&mask_all);
+    //     sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    //     currjob->state = ST;
+    //     // sprintf(str, "Job [%d] (%d) stopped by signal %d\n", currjob->jid, currjob->pid, sig);
+    //     // bytes = write(STDOUT, str, sizeof(str));
+    //     // if(bytes != sizeof(str)){
+    //     //     exit(-999);
+    //     // }
+    //     printf("Job [%d] (%d) stopped by signal %d\n", currjob->jid, currjob->pid, sig);
+    //
+    //     sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+    // }
+    if(fgpid(jobs) == 0) { //no foreground job, do nothing
         return;
     }
-    struct job_t *currjob = getjobpid(jobs, fgpid(jobs));
-    if(kill(fgpid(jobs), sig) == -1) {
-        fprintf(stderr, "kill error: %s\n", strerror(errno));
-    }else {
-        sigset_t mask_all, prev_all;
-        sigfillset(&mask_all);
-        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-        currjob->state = ST;
-        sprintf(str, "Job [%d] (%d) stopped by signal %d\n", currjob->jid, currjob->pid, sig);
-        bytes = write(STDOUT, str, sizeof(str));
-        if(bytes != sizeof(str)){
-            exit(-999);
-        }
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
-    }
+    // if(kill(-fgpid(jobs), sig) < 0) {
+    //     unix_error("sigtstp_handler: kill error");
+    // }
+    kill(-fgpid(jobs), sig);
     return;
 }
 
