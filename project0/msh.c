@@ -230,13 +230,13 @@ void do_bgfg(char **argv)
         printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
     }
-    // char *id = argv[1];
-    // sigset_t mask_all, prev_all;        /* Stores blocked signals */
-    // sigfillset(&mask_all);
-    // sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    sigset_t mask_all, prev_all;        /* Stores blocked signals */
+    sigfillset(&mask_all);
+    sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
     int jid;
     pid_t pid;
     struct job_t *currjob = NULL;
+
     if (argv[1][0] == '%') {      // Access job through jid
         // Checks wheather jid is a number
         if (atoi(&argv[1][1]) == 0) {
@@ -267,12 +267,12 @@ void do_bgfg(char **argv)
     if (!strcmp(argv[0], "bg")) {       /* bg command */
         kill(-(currjob->pid), SIGCONT);
         currjob->state = BG;
-        // sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
         printf("[%d] (%d) %s",currjob->jid, currjob->pid, currjob->cmdline);
     } else {        /* fg command */
         kill(-(currjob->pid), SIGCONT);
         currjob->state = FG;
-        // sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
         waitfg(currjob->pid);
     }
     return;
@@ -284,7 +284,7 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
     sigset_t mask, prevmask;        /* Stores blocked signals */
-    // why block signals?????????????????????????????????????????????????????????????????
+    // why block signals????????????????????????????????????????????????????
     sigemptyset(&mask);
     sigaddset(&mask,SIGCHLD);
     sigprocmask(SIG_BLOCK, &mask, &prevmask);
@@ -311,17 +311,17 @@ void sigchld_handler(int sig)
 {
     int status;         /* Status of process */
     pid_t pid;          /* Process ID */
-    char str[80];       /* Stores message to print */
-    sigset_t mask_all, prev_all;        /* Stores blocked signals */
+    char str[1024];       /* Stores message to print */
+    // sigset_t mask_all, prev_all;        /* Stores blocked signals */
     ssize_t bytes;      /* Number of bytes written */
     const int STDOUT = 1;
-    sigfillset(&mask_all);
+    // sigfillset(&mask_all);
 
     while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) {
         /* Child process has terminated or stopped */
         struct job_t *job = getjobpid(jobs, pid);
         // Block all signals before modefying jobs
-        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        // sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         if (WIFSIGNALED(status)) {  /* child terminated by uncaught signal */
             sprintf(str, "Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, WTERMSIG(status));
             bytes = write(STDOUT, str, strlen(str));
@@ -339,7 +339,7 @@ void sigchld_handler(int sig)
             }
             job->state = ST;
         }
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        // sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
     return;
 }
@@ -355,10 +355,11 @@ void sigint_handler(int sig)
     if (fgpid(jobs) == 0) { //no foreground job, do nothing
         return;
     }
-    // if (kill(-fgpid(jobs), sig) < 0) {
-    //     unix_error("sigint_handler: kill error");
-    // }
-    kill(-fgpid(jobs), sig);
+    // send the signal to the process group containing the foreground job
+    if (kill(-fgpid(jobs), sig) < 0) {
+        unix_error("sigint_handler: kill error");
+    }
+    // kill(-fgpid(jobs), sig);
     return;
 }
 
@@ -372,10 +373,11 @@ void sigtstp_handler(int sig)
     if (fgpid(jobs) == 0) { //no foreground job, do nothing
         return;
     }
-    // if (kill(-fgpid(jobs), sig) < 0) {
-    //     unix_error("sigtstp_handler: kill error");
-    // }
-    kill(-fgpid(jobs), sig);
+    // send the signal to the process group containing the foreground job
+    if (kill(-fgpid(jobs), sig) < 0) {
+        unix_error("sigtstp_handler: kill error");
+    }
+    // kill(-fgpid(jobs), sig);
     return;
 }
 
