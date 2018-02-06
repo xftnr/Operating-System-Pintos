@@ -231,8 +231,6 @@ void do_bgfg(char **argv)
         return;
     }
     sigset_t mask_all, prev_all;        /* Stores blocked signals */
-    sigfillset(&mask_all);
-    sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
     int jid;
     pid_t pid;
     struct job_t *currjob = NULL;
@@ -264,6 +262,10 @@ void do_bgfg(char **argv)
         }
         currjob = getjobpid(jobs, pid);
     }
+
+    // Block signals before modefying jobs
+    sigfillset(&mask_all);
+    sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
     if (!strcmp(argv[0], "bg")) {       /* bg command */
         kill(-(currjob->pid), SIGCONT);
         currjob->state = BG;
@@ -284,7 +286,6 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
     sigset_t mask, prevmask;        /* Stores blocked signals */
-    // why block signals????????????????????????????????????????????????????
     sigemptyset(&mask);
     sigaddset(&mask,SIGCHLD);
     sigprocmask(SIG_BLOCK, &mask, &prevmask);
@@ -312,16 +313,12 @@ void sigchld_handler(int sig)
     int status;         /* Status of process */
     pid_t pid;          /* Process ID */
     char str[1024];       /* Stores message to print */
-    // sigset_t mask_all, prev_all;        /* Stores blocked signals */
     ssize_t bytes;      /* Number of bytes written */
     const int STDOUT = 1;
-    // sigfillset(&mask_all);
 
     while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) {
         /* Child process has terminated or stopped */
         struct job_t *job = getjobpid(jobs, pid);
-        // Block all signals before modefying jobs
-        // sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         if (WIFSIGNALED(status)) {  /* child terminated by uncaught signal */
             sprintf(str, "Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, WTERMSIG(status));
             bytes = write(STDOUT, str, strlen(str));
@@ -339,7 +336,6 @@ void sigchld_handler(int sig)
             }
             job->state = ST;
         }
-        // sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
     }
     return;
 }
