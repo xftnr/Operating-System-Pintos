@@ -1,8 +1,9 @@
 /*
 * Authors: Yige Wang, Pengdi Xia
 * Date: 1/27/2018
-* Description: ...
+* Description: Compute the fibonacci with fork() function
 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -73,8 +74,9 @@ int main(int argc, char **argv)
 static void doFib(int n, int doPrint)
 {
     // set of veriables
-    pid_t pid1,pid2;
-    int status1,status2, result1, result2;
+    pid_t pid1,pid2;        /* Process ID */
+    int status1,status2;    /*status of child*/
+    int result1,result2;    /*result child passed*/
     // Yige driving
     // base case when index is 0 or 1 the value is 0 and 1
     if(n < 2){
@@ -120,3 +122,4 @@ static void doFib(int n, int doPrint)
         }
     }
 }
+
