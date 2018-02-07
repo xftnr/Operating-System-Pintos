@@ -1,3 +1,8 @@
+/*
+* Authors: Yige Wang, Pengdi Xia
+* Date: 1/27/2018
+* Description: kill a forever process and handle the signals
+*/
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -22,8 +27,8 @@
 // Yige Driving
 void handler(int sig)
 {
-    ssize_t bytes;
-    const int STDOUT = 1;
+    ssize_t bytes;          /*bytes write string length*/
+    const int STDOUT = 1;   /*standard output*/
     //handle sigint
     if(sig==SIGINT){
     /*the handler have to use the write function to print,
@@ -54,9 +59,9 @@ void handler(int sig)
 int main(int argc, char **argv)
 {
     // set of variables
-    pid_t pid;
-    struct timespec tim;
-    struct timespec rem;
+    pid_t pid;              /* Process ID */
+    struct timespec tim,rem;    /* Timeer struct set up*/
+
     if(argc != 1){
         fprintf(stderr, "Usage: ./handle\n");
         exit(-1);
@@ -70,7 +75,8 @@ int main(int argc, char **argv)
         //set up the nanosleep by 1 second
         tim.tv_sec  = 1;
         tim.tv_nsec = 0;
-        //when process interrupted in middle, starts from the remaining time.
+        /*when process interrupted in middle,
+         starts from the remaining time.*/
         while(nanosleep(&tim, &rem)==-1){
             tim=rem;
         }
