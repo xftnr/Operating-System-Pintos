@@ -6,6 +6,8 @@
  *
  * Name: Pengdi Xia
  * EID: px353
+ *
+ * Date: 1/27/2018
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +19,6 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "util.h"
-
 
 
 /* Global variables */
@@ -119,7 +120,7 @@ void eval(char *cmdline)
     strcpy(buf, cmdline);
     bg = parseline(buf, argv);
     if(argv[0] == NULL)
-       return;            /* Ignore empty lines */
+    return;            /* Ignore empty lines */
 
     if(!builtin_cmd(argv)){
         pid = fork();
@@ -128,7 +129,7 @@ void eval(char *cmdline)
         } else if(pid == 0){     /* Child runs user job */
             if(execve(argv[0], argv, environ) < 0){
                 printf("%s: Command not found.\n", argv[0]);
-                exit(0); // why exit with 0 when there is a execve() error???
+                exit(0); // occur error otherwise will not get here 
             }
         } else{
             /* Parent waits for foreground job to terminate */
