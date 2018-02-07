@@ -1,4 +1,10 @@
 /*
+* Authors: Yige Wang, Pengdi Xia
+* Date: 1/27/2018
+* Description: Handles SIGINT and SIGUSER1 sent to a running process.
+*/
+
+/*
 * msh - A mini shell program with job control
 *
 * <Put your name and login ID here>

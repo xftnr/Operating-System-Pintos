@@ -1,8 +1,9 @@
 /*
 * Authors: Yige Wang, Pengdi Xia
 * Date: 1/27/2018
-* Description: Kill process, which sand the signal to the handle and kill it.
+* Description: Sends a signal to kill a process.
 */
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -27,15 +28,16 @@
 int main(int argc, char **argv)
 {
     pid_t pid;      /* Process ID */
+
     // check precondition
     if(argc != 2){
         unix_error("mykill: input error");
     }
+
+    // send SIGUSER1 to the process with pid entered by user
     pid = atoi(argv[1]);
-    // send the signal and check the system call
     if(kill(pid, SIGUSR1)==-1){
         unix_error("mykill: kill error");
     }
     return 0;
 }
-
