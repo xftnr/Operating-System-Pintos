@@ -1,3 +1,8 @@
+/*
+* Authors: Yige Wang, Pengdi Xia
+* Date: 1/27/2018
+* Description: Kill process, which sand the signal to the handle and kill it.
+*/
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -33,3 +38,4 @@ int main(int argc, char **argv)
     }
     return 0;
 }
+
