@@ -174,7 +174,7 @@ void eval(char *cmdline)//add job plz
             if (!bg) {
                 /* Waits for foreground process to finish */
                 addjob(jobs, pid, FG, cmdline);
-                if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+                if (sigprocmask(SIG_UNBLOCK, &mask, &prevmask) < 0 ) {
                     unix_error("eval: sigprocmask error");
                 }
                 waitfg(pid);
@@ -182,7 +182,7 @@ void eval(char *cmdline)//add job plz
                 /* Prints a confirmation message for background process*/
                 addjob(jobs, pid, BG, cmdline);
                 printf("[%d] (%d) %s",pid2jid(jobs, pid), pid, cmdline);
-                if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+                if (sigprocmask(SIG_UNBLOCK, &mask, &prevmask) < 0 ) {
                     unix_error("eval: sigprocmask error");
                 }
             }
@@ -212,11 +212,18 @@ int builtin_cmd(char **argv)
         do_bgfg(argv);
         return 1;
     }
+    // CHECK ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     sigfillset(&mask_all);      //Blocks all signals before accessing jobs
     if (!strcmp(argv[0], "jobs")) {      /* jobs command */
-        sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        //sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        if (sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ) {
+            unix_error("eval: sigprocmask error");
+        }
         listjobs(jobs);
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+            unix_error("eval: sigprocmask error");
+        }
         return 1;
     }
     if (!strcmp(argv[0], "&")) {        /* Ignore singleton */
@@ -245,42 +252,51 @@ void do_bgfg(char **argv)
         // Checks wheather jid is a number
         if (atoi(&argv[1][1]) == 0) {
             printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-            return;
+            exit(-1);
         }
         jid = atoi(&argv[1][1]);
         // Checks wheather such job exists
         if (getjobjid(jobs,jid) == NULL) {
             printf("%%%d: No such job\n", jid);
-            return;
+            exit(-1);
         }
         currjob = getjobjid(jobs, jid);
     } else {        // Access job through pid
         // Checks wheather pid is a number
         if (atoi(argv[1]) == 0) {
             printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-            return;
+            exit(-1);
         }
         pid = atoi(argv[1]);
         // Checks wheather such process exists
         if (getjobpid(jobs,pid) == NULL) {
             printf("(%d): No such process\n", pid);
-            return;
+            exit(-1);
         }
         currjob = getjobpid(jobs, pid);
     }
 
-    // Block signals before modefying jobs
+    // Block signals before modefying jobs  CHECK ERROR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     sigfillset(&mask_all);
-    sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    //sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    if (sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ) {
+        unix_error("eval: sigprocmask error");
+    }
     if (!strcmp(argv[0], "bg")) {       /* bg command */
         kill(-(currjob->pid), SIGCONT);
         currjob->state = BG;
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+            unix_error("eval: sigprocmask error");
+        }
         printf("[%d] (%d) %s",currjob->jid, currjob->pid, currjob->cmdline);
     } else {        /* fg command */
         kill(-(currjob->pid), SIGCONT);
         currjob->state = FG;
-        sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
+        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+            unix_error("eval: sigprocmask error");
+        }
         waitfg(currjob->pid);
     }
     return;
@@ -291,6 +307,7 @@ void do_bgfg(char **argv)
 */
 void waitfg(pid_t pid)
 {
+    // CHECK ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     sigset_t mask, prevmask;        /* Stores blocked signals */
     sigemptyset(&mask);
     sigaddset(&mask,SIGCHLD);
