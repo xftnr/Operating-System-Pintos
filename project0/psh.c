@@ -108,7 +108,7 @@ int main(int argc, char **argv)
  * the foreground, wait for it to terminate and then return.
 */
 
-/* Code from CSAPP*/
+/* Code from CSAPP by Bryant and O'Hallaron, page 791, line 4-31 */
 // Yige driving
 void eval(char *cmdline)
 {
@@ -119,26 +119,26 @@ void eval(char *cmdline)
 
     strcpy(buf, cmdline);
     bg = parseline(buf, argv);
-    if(argv[0] == NULL)
-    return;            /* Ignore empty lines */
+    if (argv[0] == NULL)
+        return;            /* Ignore empty lines */
 
-    if(!builtin_cmd(argv)){
+    if (!builtin_cmd(argv)) {
         pid = fork();
         if (pid < 0){
             unix_error("eval: fork error");
-        } else if(pid == 0){     /* Child runs user job */
-            if(execve(argv[0], argv, environ) < 0){
+        } else if(pid == 0) {     /* Child runs user job */
+            if (execve(argv[0], argv, environ) < 0) {
                 printf("%s: Command not found.\n", argv[0]);
                 exit(0); // occur error otherwise will not get here 
             }
-        } else{
+        } else {
             /* Parent waits for foreground job to terminate */
-            if(!bg){
+            if (!bg) {
                 int status;
                 if(waitpid(pid, &status, 0) < 0) {
                     unix_error("waitfg: waitpid error");
                 }
-            } else{
+            } else {
                 printf("%d %s", pid, cmdline);
             }
         }
@@ -154,13 +154,13 @@ void eval(char *cmdline)
  * if the argument passed in is *not* a builtin command.
  */
 
-/* Code from CSAPP*/
+/* Code from CSAPP by Bryant and O'Hallaron, page 791, line 37-41 */
 // Yige driving
 int builtin_cmd(char **argv)
 {
-    if(!strcmp(argv[0], "quit"))     /* quit command */
+    if (!strcmp(argv[0], "quit"))     /* quit command */
        exit(0);
-    if(!strcmp(argv[0], "&"))        /* Ignore singleton */
+    if (!strcmp(argv[0], "&"))        /* Ignore singleton */
        return 1;
      return 0;     /* not a builtin command */
 }
