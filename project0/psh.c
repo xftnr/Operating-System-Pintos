@@ -108,7 +108,9 @@ int main(int argc, char **argv)
  * the foreground, wait for it to terminate and then return.
 */
 
-/* Code from CSAPP by Bryant and O'Hallaron, page 791, line 4-31 */
+/* Code from CSAPP 3e by Bryant and O'Hallaron,
+ * Section 8.4, page 755
+ */
 // Yige driving
 void eval(char *cmdline)
 {
@@ -129,7 +131,7 @@ void eval(char *cmdline)
         } else if(pid == 0) {     /* Child runs user job */
             if (execve(argv[0], argv, environ) < 0) {
                 printf("%s: Command not found.\n", argv[0]);
-                exit(0); // occur error otherwise will not get here 
+                exit(0); // occur error otherwise will not get here
             }
         } else {
             /* Parent waits for foreground job to terminate */
@@ -154,7 +156,9 @@ void eval(char *cmdline)
  * if the argument passed in is *not* a builtin command.
  */
 
-/* Code from CSAPP by Bryant and O'Hallaron, page 791, line 37-41 */
+ /* Code from CSAPP 3e by Bryant and O'Hallaron,
+  * Section 8.4, page 755
+  */
 // Yige driving
 int builtin_cmd(char **argv)
 {

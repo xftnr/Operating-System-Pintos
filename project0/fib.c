@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 *
 * n: index of the fibonacci
 * doPrint: wheather or not to print the result.
-* True for original process and false for others.
+* true for original process and false for others.
 *
 * returns: the nth fibonacci result.
 */

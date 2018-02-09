@@ -129,7 +129,7 @@ int main(int argc, char **argv)
 */
 
 // Yige driving
-void eval(char *cmdline)//add job plz
+void eval(char *cmdline)
 {
 
     char *argv[MAXARGS];  /* Argument list execve() */
@@ -141,7 +141,7 @@ void eval(char *cmdline)//add job plz
     strcpy(buf, cmdline);
     bg = parseline(buf, argv);
     if (argv[0] == NULL)
-    return;            /* Ignore empty lines */
+        return;            /* Ignore empty lines */
 
     if (!builtin_cmd(argv)) {
         /* Not a built-in command, load and run the executable program */
@@ -198,6 +198,7 @@ void eval(char *cmdline)//add job plz
  * Return 1 if a builtin command was executed; return 0
  * if the argument passed in is *not* a builtin command.
  */
+
 int builtin_cmd(char **argv)
 {
     sigset_t mask_all, prev_all;        /* Stores blocked signals */
@@ -212,16 +213,17 @@ int builtin_cmd(char **argv)
         do_bgfg(argv);
         return 1;
     }
-    // CHECK ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    sigfillset(&mask_all);      //Blocks all signals before accessing jobs
+
+    // Blocks all signals before accessing jobs
+    if (sigfillset(&mask_all) < 0) {
+        unix_error("eval: sigfillset error");
+    }
     if (!strcmp(argv[0], "jobs")) {      /* jobs command */
-        //sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-        if (sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ) {
+        if (sigprocmask(SIG_BLOCK,&mask_all, &prev_all) < 0 ) {
             unix_error("eval: sigprocmask error");
         }
         listjobs(jobs);
-        //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
-        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+        if (sigprocmask(SIG_UNBLOCK,&mask_all, &prev_all) < 0 ) {
             unix_error("eval: sigprocmask error");
         }
         return 1;
@@ -236,6 +238,7 @@ int builtin_cmd(char **argv)
 /*
  * do_bgfg - Execute the builtin bg and fg commands
  */
+
 // Pengdi driving
 void do_bgfg(char **argv)
 {
@@ -252,49 +255,55 @@ void do_bgfg(char **argv)
         // Checks wheather jid is a number
         if (atoi(&argv[1][1]) == 0) {
             printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-            exit(-1);
+            return;
         }
         jid = atoi(&argv[1][1]);
         // Checks wheather such job exists
         if (getjobjid(jobs,jid) == NULL) {
             printf("%%%d: No such job\n", jid);
-            exit(-1);
+            return;
         }
         currjob = getjobjid(jobs, jid);
     } else {        // Access job through pid
         // Checks wheather pid is a number
         if (atoi(argv[1]) == 0) {
             printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-            exit(-1);
+            return;
         }
         pid = atoi(argv[1]);
         // Checks wheather such process exists
         if (getjobpid(jobs,pid) == NULL) {
             printf("(%d): No such process\n", pid);
-            exit(-1);
+            return;
         }
         currjob = getjobpid(jobs, pid);
     }
 
-    // Block signals before modefying jobs  CHECK ERROR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    sigfillset(&mask_all);
+    // Blocks all signals before accessing jobs
+    if (sigfillset(&mask_all) < 0) {
+        unix_error("eval: sigfillset error");
+    }
     //sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-    if (sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ) {
+    if (sigprocmask(SIG_BLOCK,&mask_all, &prev_all) < 0 ) {
         unix_error("eval: sigprocmask error");
     }
     if (!strcmp(argv[0], "bg")) {       /* bg command */
-        kill(-(currjob->pid), SIGCONT);
+        if (kill(-(currjob->pid), SIGCONT) < 0){
+            unix_error("do_bgfg: kill error");
+        }
         currjob->state = BG;
         //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
-        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+        if (sigprocmask(SIG_UNBLOCK,&mask_all, &prev_all) < 0 ) {
             unix_error("eval: sigprocmask error");
         }
         printf("[%d] (%d) %s",currjob->jid, currjob->pid, currjob->cmdline);
     } else {        /* fg command */
-        kill(-(currjob->pid), SIGCONT);
+        if (kill(-(currjob->pid), SIGCONT) < 0){
+            unix_error("do_bgfg: kill error");
+        }
         currjob->state = FG;
         //sigprocmask(SIG_UNBLOCK, &mask_all, &prev_all);
-        if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+        if (sigprocmask(SIG_UNBLOCK,&mask_all, &prev_all) < 0 ) {
             unix_error("eval: sigprocmask error");
         }
         waitfg(currjob->pid);
@@ -304,19 +313,29 @@ void do_bgfg(char **argv)
 
 /*
 * waitfg - Block until process pid is no longer the foreground process
+*
+* pid: process id of the foreground process to wait
 */
+
 void waitfg(pid_t pid)
 {
-    // CHECK ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     sigset_t mask, prevmask;        /* Stores blocked signals */
-    sigemptyset(&mask);
-    sigaddset(&mask,SIGCHLD);
-    sigprocmask(SIG_BLOCK, &mask, &prevmask);
+    if (sigemptyset(&mask) < 0) {
+        unix_error("waitfg: sigemptyset error");
+    }
+    if (sigaddset(&mask,SIGCHLD) < 0) {
+        unix_error("waitfg: sigaddset error");
+    }
+    if (sigprocmask(SIG_BLOCK,&mask, &prevmask) < 0 ) {
+        unix_error("waitfg: sigprocmask error");
+    }
     // Suspends shell until forground process has changed
     while(fgpid(jobs)==pid) {
         sigsuspend(&prevmask);
     }
-    sigprocmask(SIG_UNBLOCK, &mask, &prevmask);
+    if (sigprocmask(SIG_UNBLOCK,&mask, &prevmask) < 0 ) {
+        unix_error("waitfg: sigprocmask error");
+    }
     return;
 }
 
@@ -330,7 +349,10 @@ void waitfg(pid_t pid)
 *     received a SIGSTOP or SIGTSTP signal. The handler reaps all
 *     available zombie children, but doesn't wait for any other
 *     currently running children to terminate.
+*
+* sig: the signal to received
 */
+
 void sigchld_handler(int sig)
 {
     int status;         /* Status of process */
@@ -343,7 +365,8 @@ void sigchld_handler(int sig)
         /* Child process has terminated or stopped */
         struct job_t *job = getjobpid(jobs, pid);
         if (WIFSIGNALED(status)) {  /* child terminated by uncaught signal */
-            sprintf(str, "Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, WTERMSIG(status));
+            sprintf(str, "Job [%d] (%d) terminated by signal %d\n",
+                    job->jid, job->pid, WTERMSIG(status));
             bytes = write(STDOUT, str, strlen(str));
             if (bytes != strlen(str)) {
                 exit(-999);
@@ -352,7 +375,8 @@ void sigchld_handler(int sig)
         } else if (WIFEXITED(status)) {     /* Child terminated normally */
             deletejob(jobs, job->pid);
         } else if (WIFSTOPPED(status)) {        /* Child stopped by signal */
-            sprintf(str, "Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, WSTOPSIG(status));
+            sprintf(str, "Job [%d] (%d) stopped by signal %d\n",
+                    job->jid, job->pid, WSTOPSIG(status));
             bytes = write(STDOUT, str, strlen(str));
             if (bytes != strlen(str)) {
                 exit(-999);
@@ -368,6 +392,7 @@ void sigchld_handler(int sig)
 *    user types ctrl-c at the keyboard.  Catch it and send it along
 *    to the foreground job.
 */
+
 // Yige driving
 void sigint_handler(int sig)
 {
@@ -378,7 +403,6 @@ void sigint_handler(int sig)
     if (kill(-fgpid(jobs), sig) < 0) {
         unix_error("sigint_handler: kill error");
     }
-    // kill(-fgpid(jobs), sig);
     return;
 }
 
@@ -387,6 +411,7 @@ void sigint_handler(int sig)
 *     the user types ctrl-z at the keyboard. Catch it and suspend the
 *     foreground job by sending it a SIGTSTP.
 */
+
 void sigtstp_handler(int sig)
 {
     if (fgpid(jobs) == 0) { //no foreground job, do nothing
@@ -396,7 +421,6 @@ void sigtstp_handler(int sig)
     if (kill(-fgpid(jobs), sig) < 0) {
         unix_error("sigtstp_handler: kill error");
     }
-    // kill(-fgpid(jobs), sig);
     return;
 }
 

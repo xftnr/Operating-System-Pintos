@@ -15,31 +15,44 @@
 
 
 /*
- * Function: handler
+ * Function: sigint_handler
  * -----------------
- * Handles two kind of the signal: SIGINT and SIGUSER1
+ * Handles SIGINT
  * Writes "Nice try." to standart output when SIGINT is received.
- * Writes "exiting" to standart output and exits when SIGUSER1 is received.
  *
  * sig: the signal received by this process
  *
 */
 
 // Yige Driving
-void handler(int sig)
+void sigint_handler(int sig)
 {
     ssize_t bytes;          /* number of bytes written  */
     const int STDOUT = 1;   /* standard output */
+    bytes = write(STDOUT, "Nice try.\n", 10);
+    if(bytes != 10)
+        exit(-1);
+}
 
-    if (sig == SIGINT) {        // Handles SIGINT
-        bytes = write(STDOUT, "Nice try.\n", 10);
-        if(bytes != 10)
-            exit(-1);
-    } else if (sig == SIGUSR1) {        // Handles SIGUSER1
-        bytes = write(STDOUT, "exiting\n", 8);
-        if(bytes != 8)
-            exit(-1);
-    }
+/*
+ * Function: siguser1_handler
+ * -----------------
+ * Handles SIGUSER1
+ * Writes "exiting" to standart output and exits when SIGUSER1 is received.
+ *
+ * sig: the signal received by this process
+ *
+*/
+
+// Pengdi Driving
+void siguser1_handler(int sig)
+{
+    ssize_t bytes;          /* number of bytes written  */
+    const int STDOUT = 1;   /* standard output */
+    bytes = write(STDOUT, "exiting\n", 8);
+    if(bytes != 8)
+        exit(-1);
+    exit(0);
 }
 
 /*
@@ -64,8 +77,8 @@ int main(int argc, char **argv)
     }
 
     // let handler handle both SIGINT and SIGUSER1
-    Signal(SIGINT, handler);
-    Signal(SIGUSR1, handler);
+    Signal(SIGINT, sigint_handler);
+    Signal(SIGUSR1, siguser1_handler);
 
     pid = getpid();
     printf("%d\n", pid);
