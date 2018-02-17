@@ -33,28 +33,6 @@
 #include "threads/thread.h"
 
 
-/*
-* Compares the priorities between two threads.
-*
-* a - the element to be inserted
-* b - the element already in the list
-*
-* Returns true if the priority of a is less than that of b.
-*/
-static bool compare_priorities(const struct list_elem *a,
-                   const struct list_elem *b,
-                   void *aux) {
-  struct thread *t1 = NULL;
-  struct thread *t2 = NULL;
-
-  /* Gets the threads that contains element a and b. */
-  t1 = list_entry (a, struct thread, elem);
-  t2 = list_entry (b, struct thread, elem);
-
-  /* Returns the comparison between priorities. */
-  return t1->priority > t2->priority;
-}
-
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -89,11 +67,12 @@ sema_down (struct semaphore *sema)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  while (sema->value == 0)
-    {
-      list_insert_ordered (&sema->waiters, &thread_current ()->elem, compare_priorities, NULL);
-      thread_block ();
-    }
+  while (sema->value == 0) {
+    /* Insert the thread based on its priority. */
+    list_insert_ordered (&sema->waiters, &thread_current()->elem,
+                         compare_priorities, NULL);
+    thread_block ();
+  }
   sema->value--;
   intr_set_level (old_level);
 }
@@ -141,8 +120,7 @@ sema_up (struct semaphore *sema)
                                 struct thread, elem));
   }
   sema->value++;
-  test_preemption();
-
+  check_preemption();
   intr_set_level (old_level);
 }
 
@@ -274,10 +252,35 @@ lock_held_by_current_thread (const struct lock *lock)
 
 /* One semaphore in a list. */
 struct semaphore_elem
-  {
-    struct list_elem elem;              /* List element. */
-    struct semaphore semaphore;         /* This semaphore. */
-  };
+{
+  int priority;                       /* Priority. */
+  struct list_elem elem;              /* List element. */
+  struct semaphore semaphore;         /* This semaphore. */
+};
+
+/*
+* Compares the priorities between two semaphores.
+*
+* a - the element to be inserted
+* b - the element already in the list
+*
+* Returns true if the priority of a is less than that of b.
+*
+* Used in cond_wait.
+*/
+static bool compare_priorities_cv(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux) {
+  struct semaphore_elem *s1 = NULL;
+  struct semaphore_elem *s2 = NULL;
+
+  /* Gets the semaphore that contains elements a and b. */
+  s1 = list_entry (a, struct semaphore_elem, elem);
+  s2 = list_entry (b, struct semaphore_elem, elem);
+
+  /* Returns the comparison between priorities. */
+  return s1->priority > s2->priority;
+}
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -308,7 +311,7 @@ cond_init (struct condition *cond)
 
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
-   interrupts disabled, but interrupts will be turned back on if
+   interrupts disabled, but interrupts will be turned bthreadack on if
    we need to sleep. */
 void
 cond_wait (struct condition *cond, struct lock *lock)
@@ -321,7 +324,12 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered (&cond->waiters, &waiter.elem, compare_priorities, NULL);
+
+  waiter.priority = thread_current()->priority;
+
+  /* Insert the waiter based on its priority. */
+  list_insert_ordered (&cond->waiters, &waiter.elem,
+                       compare_priorities_cv, NULL);
 
   lock_release (lock);
   sema_down (&waiter.semaphore);

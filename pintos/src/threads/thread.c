@@ -71,10 +71,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static bool compare_priorities(const struct list_elem *a,
-  const struct list_elem *b,
-  void *aux);
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -119,9 +115,6 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
-
-  printf("thread_start finished");
-
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -154,12 +147,28 @@ thread_print_stats (void)
           idle_ticks, kernel_ticks, user_ticks);
 }
 
-void test_preemption(void) {
-  enum intr_level old_level = intr_disable ();
+/* Checks whether or not preemption is needed by comparing
+   the priority of current running thread and
+   the priority of the first thread in ready_list.
+
+   The current thread should yield the processor to
+   the new thread that has a higher priority. */
+// Yige, Pengdi, and Peijie Driving
+void check_preemption(void) {
+  enum intr_level old_level;    /* Old interrupt level. */
+  struct thread *t = NULL;      /* Current thread that called this function. */
+
+  old_level = intr_disable ();
   if (!list_empty (&ready_list)) {
-    struct thread *t = list_entry (list_begin (&ready_list), struct thread, elem);
-    if (t->priority > thread_current()->priority && !intr_context ()) {
-      thread_yield();
+    /* Compare the priorities */
+    t = list_entry (list_begin (&ready_list), struct thread, elem);
+    if (t->priority > thread_current()->priority) {
+      /* The new thread has a higher priority, yield the processor. */
+      if (!intr_context ()) {
+        thread_yield();
+      } else {
+        intr_yield_on_return ();
+      }
     }
   }
   intr_set_level (old_level);
@@ -219,7 +228,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-test_preemption();
+  check_preemption();
+
   return tid;
 }
 
@@ -251,7 +261,6 @@ thread_block (void)
 void
 thread_unblock (struct thread *t)
 {
-
   enum intr_level old_level;
 
   ASSERT (is_thread (t));
@@ -259,11 +268,11 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
+  /* Insert the thread based on its priority. */
   list_insert_ordered (&ready_list, &t->elem, compare_priorities, NULL);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
-
 }
 
 /*
@@ -354,9 +363,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-
+    /* Insert the thread based on its priority. */
     list_insert_ordered (&ready_list, &cur->elem, compare_priorities, NULL);
-
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -385,6 +393,8 @@ void
 thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
+  check_preemption();
+
 }
 
 /* Returns the current thread's priority. */
