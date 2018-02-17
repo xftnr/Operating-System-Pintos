@@ -232,13 +232,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
     t = list_entry (front, struct thread, sleep_elem);
     if (timer_ticks() < t->tick_to_wake) {
       /* No thread in list needs to be waken up, exits while loop. */
+      intr_set_level (old_level);
       break;
     }
     /* Wake up the thread containing first element. */
     list_pop_front(&sleep_list);
+    intr_set_level (old_level);
     sema_up(&t->sleep_mutex);
   }
-  intr_set_level (old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

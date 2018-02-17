@@ -71,6 +71,10 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+static bool compare_priorities(const struct list_elem *a,
+  const struct list_elem *b,
+  void *aux);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -183,7 +187,6 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -239,9 +242,35 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+
   list_push_back (&ready_list, &t->elem);
+
+  list_sort(&ready_list, compare_priorities, NULL);
+
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+/*
+* Compares the priorities between two threads.
+*
+* a - the element to be inserted
+* b - the element already in the list
+*
+* Returns true if the priority of a is less than that of b.
+*/
+bool compare_priorities(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux) {
+  struct thread *t1 = NULL;
+  struct thread *t2 = NULL;
+
+  /* Gets the threads that contains element a and b. */
+  t1 = list_entry (a, struct thread, elem);
+  t2 = list_entry (b, struct thread, elem);
+
+  /* Returns the comparison between wake up times. */
+  return t1->priority > t2->priority;
 }
 
 /* Returns the name of the running thread. */
@@ -309,8 +338,16 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread)
+  if (cur != idle_thread) {
+
+    // list_insert_ordered(&ready_list, &cur->elem, compare_priorities, NULL);
+
     list_push_back (&ready_list, &cur->elem);
+
+    list_sort(&ready_list, compare_priorities, NULL);
+
+
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);

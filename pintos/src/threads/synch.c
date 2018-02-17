@@ -32,6 +32,29 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+
+/*
+* Compares the priorities between two threads.
+*
+* a - the element to be inserted
+* b - the element already in the list
+*
+* Returns true if the priority of a is less than that of b.
+*/
+static bool compare_priorities(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux) {
+  struct thread *t1 = NULL;
+  struct thread *t2 = NULL;
+
+  /* Gets the threads that contains element a and b. */
+  t1 = list_entry (a, struct thread, elem);
+  t2 = list_entry (b, struct thread, elem);
+
+  /* Returns the comparison between priorities. */
+  return t1->priority > t2->priority;
+}
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -69,6 +92,7 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0)
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_sort(&sema->waiters, compare_priorities, NULL);
       thread_block ();
     }
   sema->value--;
@@ -296,6 +320,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
+  list_sort(&cond->waiters, compare_priorities, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
