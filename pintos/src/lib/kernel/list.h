@@ -16,7 +16,7 @@
 
       struct foo
         {
-          struct list_elem elem;
+          struct list_elem elem;list_elem
           int bar;
           ...other members...
         };
@@ -94,7 +94,7 @@ struct list_elem
   };
 
 /* List. */
-struct list 
+struct list
   {
     struct list_elem head;      /* List head. */
     struct list_elem tail;      /* List tail. */

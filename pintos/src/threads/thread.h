@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -73,7 +74,7 @@ typedef int tid_t;
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
    set to THREAD_MAGIC.  Stack overflow will normally change this
-   value, triggering the assertion.  (So don't add elements below 
+   value, triggering the assertion.  (So don't add elements below
    THREAD_MAGIC.)
 */
 /* The `elem' member has a dual purpose.  It can be an element in
@@ -83,26 +84,35 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 struct thread
-  {
-    /* Owned by thread.c. */
-    tid_t tid;                          /* Thread identifier. */
-    enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
-    uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
+{
+   /* Owned by thread.c. */
+   tid_t tid;                   /* Thread identifier. */
+   enum thread_status status;   /* Thread state. */
+   char name[16];               /* Name (for debugging purposes). */
+   uint8_t *stack;              /* Saved stack pointer. */
+   int priority;                /* Priority. */
 
-    /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+   /* List element for all threads list. */
+   struct list_elem allelem;
 
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-#endif
+   /* Shared between thread.c and synch.c. */
+   struct list_elem elem;       /* List element. */
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
-  };
+   /* Number of ticks left to tick. */
+   int64_t tick_to_wake;
+   /* Used to wake up thread after sleep. */
+   struct semaphore sleep_mutex;
+   /* Used in timer.c */
+   struct list_elem sleep_elem;       /* Sleep_list element. */
+
+   #ifdef USERPROG
+   /* Owned by userprog/process.c. */
+   uint32_t *pagedir;                /* Page directory. */
+   #endif
+
+   /* Owned by thread.c. */
+   unsigned magic;                   /* Detects stack overflow. */
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
