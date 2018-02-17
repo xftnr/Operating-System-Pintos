@@ -119,6 +119,9 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+
+  printf("thread_start finished");
+
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -149,6 +152,17 @@ thread_print_stats (void)
 {
   printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
           idle_ticks, kernel_ticks, user_ticks);
+}
+
+void test_preemption(void) {
+  enum intr_level old_level = intr_disable ();
+  if (!list_empty (&ready_list)) {
+    struct thread *t = list_entry (list_begin (&ready_list), struct thread, elem);
+    if (t->priority > thread_current()->priority && !intr_context ()) {
+      thread_yield();
+    }
+  }
+  intr_set_level (old_level);
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -205,6 +219,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+test_preemption();
   return tid;
 }
 
@@ -236,6 +251,7 @@ thread_block (void)
 void
 thread_unblock (struct thread *t)
 {
+
   enum intr_level old_level;
 
   ASSERT (is_thread (t));
@@ -243,12 +259,11 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_push_back (&ready_list, &t->elem);
-
-  list_sort(&ready_list, compare_priorities, NULL);
+  list_insert_ordered (&ready_list, &t->elem, compare_priorities, NULL);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
+
 }
 
 /*
@@ -340,12 +355,7 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread) {
 
-    // list_insert_ordered(&ready_list, &cur->elem, compare_priorities, NULL);
-
-    list_push_back (&ready_list, &cur->elem);
-
-    list_sort(&ready_list, compare_priorities, NULL);
-
+    list_insert_ordered (&ready_list, &cur->elem, compare_priorities, NULL);
 
   }
   cur->status = THREAD_READY;
@@ -490,6 +500,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+
   enum intr_level old_level;
 
   ASSERT (t != NULL);

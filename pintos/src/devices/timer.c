@@ -114,9 +114,10 @@ timer_sleep (int64_t ticks)
   t->tick_to_wake = timer_ticks () + ticks;    /* Records when to wake up. */
   /* Inserts thread into sleeping list ordered based on tick_to_wake. */
   list_insert_ordered(&sleep_list, &t->sleep_elem, compare_ticks, NULL);
-  intr_set_level (old_level);
 
   sema_down(&t->sleep_mutex);
+  intr_set_level (old_level);
+
 }
 
 /*
