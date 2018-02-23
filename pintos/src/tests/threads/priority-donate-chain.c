@@ -76,7 +76,6 @@ test_priority_donate_chain (void)
       snprintf (name, sizeof name, "interloper %d", i);
       thread_create (name, thread_priority - 1, interloper_thread_func, NULL);
     }
-
   lock_release (&locks[0]);
   msg ("%s finishing with priority %d.", thread_name (),
                                          thread_get_priority ());

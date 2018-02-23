@@ -94,8 +94,8 @@ struct thread
 
   int old_priority;            /* Priority before donation. */
 
-  struct list donor_list;
-  struct list_elem donor_elem;
+  struct list lock_holding;      /* List of locks holding. */
+  struct list lock_waiting;      /* List of locks waiting for. */
 
   struct list_elem allelem;    /* List element for all threads list. */
 

@@ -162,6 +162,7 @@ void check_preemption(void) {
   if (!list_empty (&ready_list)) {
     /* Compare the priorities */
     t = list_entry (list_begin (&ready_list), struct thread, elem);
+
     if (t->priority > thread_current()->priority) {
       /* The new thread has a higher priority, yield the processor. */
       if (!intr_context ()) {
@@ -206,8 +207,10 @@ thread_create (const char *name, int priority,
   if (t == NULL)
     return TID_ERROR;
 
+
   /* Initialize thread. */
   init_thread (t, name, priority);
+
   tid = t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
@@ -225,7 +228,7 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  /* Add to run queue. */
+  /* Add to ready queue. */
   thread_unblock (t);
 
   check_preemption();
@@ -247,9 +250,6 @@ thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current ()->status = THREAD_BLOCKED;
-
-  list_sort(&ready_list, compare_priorities, NULL);
-
   schedule ();
 }
 
@@ -395,8 +395,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  if (thread_current ()->priority == thread_current ()->old_priority) {
+    // priority not donated
+    thread_current ()->priority = new_priority;
+  }
   thread_current ()->old_priority = new_priority;
-  thread_current ()->priority = new_priority;
   check_preemption();
 }
 
@@ -527,7 +530,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->old_priority = priority;
   t->magic = THREAD_MAGIC;
-  list_init (&t->donor_list);
+  list_init (&t->lock_holding);
+  list_init (&t->lock_waiting);
+
 
   /* Initializes semaphore for sleep to 0 so the thread will
      be blocked when sema_down is called in timer_sleep. */
