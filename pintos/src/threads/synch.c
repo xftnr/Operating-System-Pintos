@@ -185,6 +185,29 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+
+/*
+* Compares the priorities between two threads.
+*
+* a - the element to be inserted
+* b - the element already in the list
+*
+* Returns true if the priority of a is less than that of b.
+*/
+bool compare_priorities_lock(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux) {
+  struct thread *t1 = NULL;
+  struct thread *t2 = NULL;
+
+  /* Gets the threads that contains element a and b. */
+  t1 = list_entry (a, struct thread, donor_elem);
+  t2 = list_entry (b, struct thread, donor_elem);
+
+  /* Returns the comparison between wake up times. */
+  return t1->priority > t2->priority;
+}
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -200,6 +223,12 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  if (lock->holder != NULL && thread_current()->priority > lock->holder->old_priority) {
+    lock->holder->priority = thread_current()->priority;
+    list_insert_ordered (&lock->holder->donor_list, &thread_current()->donor_elem, compare_priorities_lock, NULL);
+
+    // list_push_back(&lock->holder->donor_list, &thread_current()->donor_elem);
+  }
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -235,6 +264,16 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  if (!list_empty (&lock->holder->donor_list))  {
+    list_pop_front(&lock->holder->donor_list);
+    if (!list_empty (&lock->holder->donor_list))  {
+      lock->holder->priority = list_entry (list_begin(&lock->holder->donor_list), struct thread, donor_elem)->priority;
+    } else {
+      lock->holder->priority = lock->holder->old_priority;
+    }
+  } else {
+    lock->holder->priority = lock->holder->old_priority;
+  }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }

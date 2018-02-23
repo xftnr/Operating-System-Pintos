@@ -247,6 +247,9 @@ thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current ()->status = THREAD_BLOCKED;
+
+  list_sort(&ready_list, compare_priorities, NULL);
+
   schedule ();
 }
 
@@ -392,9 +395,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  thread_current ()->old_priority = new_priority;
   thread_current ()->priority = new_priority;
   check_preemption();
-
 }
 
 /* Returns the current thread's priority. */
@@ -522,7 +525,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->old_priority = priority;
   t->magic = THREAD_MAGIC;
+  list_init (&t->donor_list);
 
   /* Initializes semaphore for sleep to 0 so the thread will
      be blocked when sema_down is called in timer_sleep. */
