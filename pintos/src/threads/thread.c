@@ -1,3 +1,9 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang
+* Date: 02/23/2018
+* Description: Basic thread support of system.
+*/
+
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -156,13 +162,12 @@ thread_print_stats (void)
 // Yige, Pengdi, and Peijie Driving
 void check_preemption(void) {
   enum intr_level old_level;    /* Old interrupt level. */
-  struct thread *t = NULL;      /* Current thread that called this function. */
+  struct thread *t = NULL;      /* Current thread called this function. */
 
   old_level = intr_disable ();
   if (!list_empty (&ready_list)) {
     /* Compare the priorities */
     t = list_entry (list_begin (&ready_list), struct thread, elem);
-
     if (t->priority > thread_current()->priority) {
       /* The new thread has a higher priority, yield the processor. */
       if (!intr_context ()) {
@@ -231,6 +236,9 @@ thread_create (const char *name, int priority,
   /* Add to ready queue. */
   thread_unblock (t);
 
+  // Pengdi Driving
+
+  /* Always check pre-emption after thread_unblock. */
   check_preemption();
 
   return tid;
@@ -253,6 +261,30 @@ thread_block (void)
   schedule ();
 }
 
+
+/*
+* Compares the priorities between two threads.
+*
+* a - the element to be inserted
+* b - the element already in the list
+*
+* Returns true if the priority of a is less than that of b.
+*/
+// Yige Driving
+bool compare_priorities(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux) {
+  struct thread *t1 = NULL;
+  struct thread *t2 = NULL;
+
+  /* Gets the threads that contains element a and b. */
+  t1 = list_entry (a, struct thread, elem);
+  t2 = list_entry (b, struct thread, elem);
+
+  /* Returns the comparison between wake up times. */
+  return t1->priority > t2->priority;
+}
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -271,33 +303,13 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
+  // Pengdi Driving
+
   /* Insert the thread based on its priority. */
   list_insert_ordered (&ready_list, &t->elem, compare_priorities, NULL);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
-}
-
-/*
-* Compares the priorities between two threads.
-*
-* a - the element to be inserted
-* b - the element already in the list
-*
-* Returns true if the priority of a is less than that of b.
-*/
-bool compare_priorities(const struct list_elem *a,
-                   const struct list_elem *b,
-                   void *aux) {
-  struct thread *t1 = NULL;
-  struct thread *t2 = NULL;
-
-  /* Gets the threads that contains element a and b. */
-  t1 = list_entry (a, struct thread, elem);
-  t2 = list_entry (b, struct thread, elem);
-
-  /* Returns the comparison between wake up times. */
-  return t1->priority > t2->priority;
 }
 
 /* Returns the name of the running thread. */
@@ -366,8 +378,11 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
+    // Pengdi Driving
+
     /* Insert the thread based on its priority. */
-    list_insert_ordered (&ready_list, &cur->elem, compare_priorities, NULL);
+    list_insert_ordered (&ready_list, &cur->elem,
+                            compare_priorities, NULL);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -400,6 +415,8 @@ thread_set_priority (int new_priority)
     thread_current ()->priority = new_priority;
   }
   thread_current ()->old_priority = new_priority;
+
+  /* Always check pre-emption after priority has been changed. */
   check_preemption();
 }
 
@@ -533,6 +550,8 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->lock_holding);
   list_init (&t->lock_waiting);
 
+
+  // Yige Driving
 
   /* Initializes semaphore for sleep to 0 so the thread will
      be blocked when sema_down is called in timer_sleep. */

@@ -102,7 +102,7 @@ struct thread
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;       /* List element. */
 
-  int64_t tick_to_wake;             /* Number of ticks left to tick. */
+  int64_t tick_to_wake;             /* When to wake up. */
   struct semaphore sleep_mutex;     /* Used to wake up thread after sleep. */
 
   /* Used in timer.c */

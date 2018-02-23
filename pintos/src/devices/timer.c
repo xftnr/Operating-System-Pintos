@@ -1,3 +1,9 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang
+* Date: 02/16/2018
+* Description: System timer that ticks 100 times per second.
+*/
+
 #include "devices/timer.h"
 #include <debug.h>
 #include <inttypes.h>
@@ -112,12 +118,12 @@ timer_sleep (int64_t ticks)
   old_level = intr_disable ();
   t = thread_current();
   t->tick_to_wake = timer_ticks () + ticks;    /* Records when to wake up. */
+
   /* Inserts thread into sleeping list ordered based on tick_to_wake. */
   list_insert_ordered(&sleep_list, &t->sleep_elem, compare_ticks, NULL);
 
   sema_down(&t->sleep_mutex);
   intr_set_level (old_level);
-
 }
 
 /*
@@ -213,8 +219,10 @@ timer_print_stats (void)
 /* Timer interrupt handler.
    Every time there is a timer interrupt, check whether there
    are threads to be waken up: ticks == t -> tick_to_wake.
+
    Continue to check the first element in the list since
    the threads are ordered by their time to wake up.
+
    Stop is the list is empty or ticks < t -> tick_to_wake. */
 // Yige, Pengdi, and Peijie Driving
 static void
@@ -228,19 +236,19 @@ timer_interrupt (struct intr_frame *args UNUSED)
   struct list_elem *front;          /* First element of the list. */
 
   old_level = intr_disable ();
+
   while(!list_empty(&sleep_list)) {
     front = list_begin(&sleep_list);
     t = list_entry (front, struct thread, sleep_elem);
     if (timer_ticks() < t->tick_to_wake) {
-      /* No thread in list needs to be waken up, exits while loop. */
-      intr_set_level (old_level);
+      /* No more threads in list needs to be waken up, exits while loop. */
       break;
     }
     /* Wake up the thread containing first element. */
     list_pop_front(&sleep_list);
-    intr_set_level (old_level);
     sema_up(&t->sleep_mutex);
   }
+  intr_set_level (old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
