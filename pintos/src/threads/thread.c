@@ -410,6 +410,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
   if (thread_current ()->priority == thread_current ()->old_priority) {
     // priority not donated
     thread_current ()->priority = new_priority;
@@ -418,6 +421,8 @@ thread_set_priority (int new_priority)
 
   /* Always check pre-emption after priority has been changed. */
   check_preemption();
+
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
