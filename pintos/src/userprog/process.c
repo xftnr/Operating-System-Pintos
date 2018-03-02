@@ -198,7 +198,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, const char *file_name);
+static bool setup_stack (void **esp, const char *file_name, int argc, char **argv);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -221,14 +221,34 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
-    goto done;
+  goto done;
   process_activate ();
 
+  // parse here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  int argc = 0;
+  char *s = malloc(sizeof(file_name));
+  strlcpy(s, file_name, strlen(file_name) + 1);
+  char *token = NULL, *save_ptr = NULL;
 
-// parse here
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+  token = strtok_r (NULL, " ", &save_ptr)) {
+    argc++;
+  }
 
-  /* Open executable file. */
-  file = filesys_open (file_name);
+  strlcpy(s, file_name, strlen(file_name) + 1);
+
+  // save argv change !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  char **argv = malloc(argc * sizeof(char*));
+  int index = 0;
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+  token = strtok_r (NULL, " ", &save_ptr)) {
+    argv[index] = token;
+    index++;
+  }
+
+
+
+  file = filesys_open(argv[0]);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -264,7 +284,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       switch (phdr.p_type)
         {
         case PT_NULL:
-        case PT_NOTE:
+        case PT_NOTE:printf("here is argv : %s\n\n\n\n\n\n\n", argv[0]);
         case PT_PHDR:
         case PT_STACK:
         default:
@@ -308,7 +328,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, file_name))
+  if (!setup_stack (esp, file_name, argc, argv))
     goto done;
 
   /* Start address. */
@@ -371,6 +391,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
   return true;
 }
 
+
 /* Loads a segment starting at offset OFS in FILE at address
    UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
    memory are initialized, as follows:
@@ -381,7 +402,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
         - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.
 
    The pages initialized by this function must be writable by the
-   user process if WRITABLE is true, read-only otherwise.
+   user process if WRITABLE is true,
+ read-only otherwise.
 
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
@@ -392,6 +414,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
+
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
@@ -406,6 +429,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
+
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
@@ -433,7 +457,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, const char *file_name)
+setup_stack (void **esp, const char *file_name, int argc, char **argv)
 {
   uint8_t *kpage;
   bool success = false;
@@ -445,68 +469,54 @@ setup_stack (void **esp, const char *file_name)
     if (success) {
       *esp = PHYS_BASE;
 
-
-      /* Argument Passing */
-      int argc = 0;
-      char *token, *save_ptr;
-
-      for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
-      token = strtok_r (NULL, " ", &save_ptr)) {
-        argc++;
-      }
-
-
-      // save argv
-      char *argv[argc], argv_addr[argc];
       int i = 0;
-      for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
-      token = strtok_r (NULL, " ", &save_ptr)) {
-        argv[i] = token;
-        i++;
-      }
-
-
+      /* Argument Passing */
+      char * argv_addr[argc];
 
       // push argv onto the stack in reverse order
-      char *char_esp = (char *) *esp;
+      char * char_esp = (char *) *esp;
       int align = 0;
 
       for (i = argc - 1; i >= 0; i--) {
-        char_esp -= (strlen(argv[i]) + 1);
-        align += (strlen(argv[i]) + 1);
-        *char_esp = *argv[i];
+        char_esp -= (strlen(argv[i]) + 1);    // move the pointer down
+        align += (strlen(argv[i]) + 1);   // align
+        // copy argv onto pointer
+        strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);
         argv_addr[i] = char_esp;
       }
 
-      *esp = char_esp;
+      *esp = char_esp;  // update esp
 
       // word align
       uint8_t word_align = 0;
       uint8_t *align_esp = (uint8_t *) *esp;
 
       align %= 4;
-
-      for (i = 0; i < align; i++) {
-        char_esp--;
-        *char_esp = word_align;
+      if (align > 0) {
+        align = 4 - align;
       }
 
+      for (i = 0; i < align; i++) {
+        align_esp--;
+        *align_esp = word_align;
+      }
       *esp = align_esp;
 
+
       // push argv[]
-      char * *char_ptr_esp = (char * *) *esp;
+      char **char_ptr_esp = (char **) *esp;
 
       char_ptr_esp--;
-      *char_ptr_esp = '0';
+      *char_ptr_esp = (char *) 0;   // write address 0 indicating no more argv
+
       for (i = argc - 1; i >= 0; i--) {
         char_ptr_esp--;
         *char_ptr_esp = argv_addr[i];
       }
-
       *esp = char_ptr_esp;
 
       // push argv
-      char ***temp_esp = char_ptr_esp;
+      char **temp_esp = char_ptr_esp;    // save the argv address
       char ***char_ptr_ptr_esp = (char ***) *esp;
 
       char_ptr_ptr_esp--;
@@ -519,9 +529,11 @@ setup_stack (void **esp, const char *file_name)
       *int_esp = argc;
       *esp = int_esp;
 
-      esp--;
-      *((uint32_t *)*esp) = 0;
+      void **void_ptr_esp = (void **) *esp;
 
+      void_ptr_esp--;
+      *void_ptr_esp = (void *) 0;
+      *esp = void_ptr_esp;
 
       hex_dump ((uintptr_t)*esp, *esp, PHYS_BASE - *esp, 1);
 
