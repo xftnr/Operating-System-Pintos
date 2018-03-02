@@ -226,7 +226,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   // parse here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
   int argc = 0;
-  char *s = malloc(sizeof(file_name));
+  char s[128];
   strlcpy(s, file_name, strlen(file_name) + 1);
   char *token = NULL, *save_ptr = NULL;
 
@@ -238,7 +238,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy(s, file_name, strlen(file_name) + 1);
 
   // save argv change !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  char **argv = malloc(argc * sizeof(char*));
+  char *argv[128];
   int index = 0;
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
   token = strtok_r (NULL, " ", &save_ptr)) {
