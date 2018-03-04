@@ -217,6 +217,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  int argc;                   /* Argument count */
+  char s[128];                /* Temperary string to hold the command line */
+  char *token = NULL;         /* Tokenized argument */
+  char *save_ptr = NULL;      /* Saved position in String */
+  char *argv[128];     /* Argument vector */
+  int index;                  /* Index in the array*/
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -224,28 +230,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
   goto done;
   process_activate ();
 
-  // parse here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-  int argc = 0;
-  char s[128];
+  // Yige, Pengdi, Peijie, Wei Po driving
+  /* Parse command line arguments */
+  // Count number of arguments
+  argc = 0;
   strlcpy(s, file_name, strlen(file_name) + 1);
-  char *token = NULL, *save_ptr = NULL;
-
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
   token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }
 
+  // Save arguments to the argument vector
+  index = 0;
   strlcpy(s, file_name, strlen(file_name) + 1);
-
-  // save argv change !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  char *argv[128];
-  int index = 0;
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
   token = strtok_r (NULL, " ", &save_ptr)) {
     argv[index] = token;
     index++;
   }
-
 
 
   file = filesys_open(argv[0]);
@@ -461,6 +463,17 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
 {
   uint8_t *kpage;
   bool success = false;
+  int i;                    /* Index */
+  char *argv_addr[argc];    /* The address of each argument on stack */
+  char *char_esp = NULL;    /* Stack pointer to a character */
+  int align;                /* Keep track of word alignment */
+  uint8_t word_align;       /* Number used to align */
+  uint8_t *align_esp = NULL;      /* Stack pointer to an unsigned integer */
+  char **char_ptr_esp = NULL;     /* Stack pointer to a character pointer */
+  char **argv_esp = NULL;         /* Stack pointer to argv */
+  char ***argv_ptr_esp = NULL;    /* Stack pointer to argv pointer */
+  int *int_esp = NULL;            /* Stack pointer to an integer pointer */
+  void **fake_ptr_esp = NULL;     /* Stack pointer to fake return address */
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
@@ -469,28 +482,24 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
     if (success) {
       *esp = PHYS_BASE;
 
-      int i = 0;
       /* Argument Passing */
-      char * argv_addr[argc];
-
-      // push argv onto the stack in reverse order
-      char * char_esp = (char *) *esp;
-      int align = 0;
-
+      /* Push argv onto the stack in reverse order */
+      char_esp = (char *) *esp;
+      align = 0;
       for (i = argc - 1; i >= 0; i--) {
-        char_esp -= (strlen(argv[i]) + 1);    // move the pointer down
-        align += (strlen(argv[i]) + 1);   // align
-        // copy argv onto pointer
-        strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);
-        argv_addr[i] = char_esp;
+        char_esp -= (strlen(argv[i]) + 1);    // Decrement pointer for argument
+        align += (strlen(argv[i]) + 1);       // Increment bytes used
+        strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);    // copy argument
+        argv_addr[i] = char_esp;         // Save argument's address on stack
       }
 
-      *esp = char_esp;  // update esp
+      *esp = char_esp;      // Update stack pointer
 
-      // word align
-      uint8_t word_align = 0;
-      uint8_t *align_esp = (uint8_t *) *esp;
+      /* Word align addresses */
+      align_esp = (uint8_t *) *esp;
+      word_align = 0;
 
+      // Calculate number of bytes needed to align
       align %= 4;
       if (align > 0) {
         align = 4 - align;
@@ -498,45 +507,47 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
 
       for (i = 0; i < align; i++) {
         align_esp--;
-        *align_esp = word_align;
+        *align_esp = word_align;      // Write the number to stack
       }
-      *esp = align_esp;
 
+      *esp = align_esp;               // Update stack pointer
 
-      // push argv[]
-      char **char_ptr_esp = (char **) *esp;
+      /* Push arguments' addresses on stack onto the stack in reverse order */
+      char_ptr_esp = (char **) *esp;
 
+      // Write address 0 indicating end of arguments
       char_ptr_esp--;
-      *char_ptr_esp = (char *) 0;   // write address 0 indicating no more argv
+      *char_ptr_esp = (char *) 0;
 
       for (i = argc - 1; i >= 0; i--) {
         char_ptr_esp--;
-        *char_ptr_esp = argv_addr[i];
+        *char_ptr_esp = argv_addr[i];     // Write the address to stack
       }
-      *esp = char_ptr_esp;
 
-      // push argv
-      char **temp_esp = char_ptr_esp;    // save the argv address
-      char ***char_ptr_ptr_esp = (char ***) *esp;
+      *esp = char_ptr_esp;                // Update stack pointer
 
-      char_ptr_ptr_esp--;
-      *char_ptr_ptr_esp = temp_esp;
+      /* Push argv (the address of argv[0]) onto the stack */
+      argv_esp = char_ptr_esp;        // Save the address for argv[0]
+      argv_ptr_esp = (char ***) *esp;
 
-      *esp = char_ptr_ptr_esp;
+      argv_ptr_esp--;
+      *argv_ptr_esp = argv_esp;   // Write the address for argv[0]
 
-      int *int_esp = (int *) *esp;
+      *esp = argv_ptr_esp;        // Update stack pointer
+
+      /* Push argc onto the stack */
+      int_esp = (int *) *esp;
       int_esp--;
-      *int_esp = argc;
-      *esp = int_esp;
+      *int_esp = argc;        // Write argc
+      *esp = int_esp;         // Update stack pointer
 
-      void **void_ptr_esp = (void **) *esp;
-
-      void_ptr_esp--;
-      *void_ptr_esp = (void *) 0;
-      *esp = void_ptr_esp;
+      /* Push fake return address onto the stack */
+      fake_ptr_esp = (void **) *esp;
+      fake_ptr_esp--;
+      *fake_ptr_esp = (void *) 0;     /* Write fake return address 0 */
+      *esp = fake_ptr_esp;
 
       hex_dump ((uintptr_t)*esp, *esp, PHYS_BASE - *esp, 1);
-
     }  else {
       palloc_free_page (kpage);
     }
