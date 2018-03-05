@@ -500,12 +500,17 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
       word_align = 0;
 
       // Calculate number of bytes needed to align
-      align %= 4;
-      if (align > 0) {
-        align = 4 - align;
-      }
+      // align %= 4;
+      // if (align > 0) {
+      //   align = 4 - align;
+      // }
+      //
+      // for (i = 0; i < align; i++) {
+      //   align_esp--;
+      //   *align_esp = word_align;      // Write the number to stack
+      // }
 
-      for (i = 0; i < align; i++) {
+      while ((esp & 0x3) != 0) {
         align_esp--;
         *align_esp = word_align;      // Write the number to stack
       }
