@@ -109,12 +109,12 @@ struct thread
   struct list_elem sleep_elem;       /* Sleep_list element. */
 
   // lock for the child
-  int child_load;
-  struct lock child_lock;
-  struct condition childCV;
+  int child_load;                     /*source variable*/
+  struct lock child_lock;             /*child lock*/
+  struct condition childCV;           /*child condition variable*/
 
   //child_list
-  struct list child_list;
+  struct list child_list;             /*child list*/
 
 
 

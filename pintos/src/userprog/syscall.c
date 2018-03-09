@@ -74,17 +74,25 @@ syscall_handler (struct intr_frame *f)
 }
 
 pid_t exec (const char *cmd_line){
+
   tid_t tid;
   struct thread *cur = thread_current ();
+
   &cur->child_load=0;
   tid=process_execute(cmd_line);
   lock_acquire(&cur->child_lock);
   while(&cur->child_load==0){
+
+    //need to signal!!!!!!!!!!!!!!!!!!!!!!!!!!!!.
     cond_wait(&cur->childCV);
   }
-  if(&cur->child_load==-1){
-    tid=-1;
+  // add child to the list
+
+  if(&cur->child_load == -1){
+    tid = -1;
   }
+  
   lock_release(&cur->child_lock);
+
   return tid;
 }
