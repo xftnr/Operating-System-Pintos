@@ -29,30 +29,62 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   printf ("system call!\n");
-  switch (f->esp) {
+  unit32_t esptemp = &f->esp;
+
+
+  // check whether is valid pointer
+  // on both esptemp and esptemp++
+  // if ()
+
+
+
+  switch (esptemp) {
     //the exec and wait
     case SYS_EXEC:
-      temp=f->esp+1;
-      exec((const char*) temp);
-
+      f->eax = exec((const char*) esptemp+1);
+      break;
     case SYS_WAIT:
+      break;
     //the the file operating
     case SYS_CREATE:
+      break;
     case SYS_REMOVE:
+      break;
     case SYS_OPEN:
+      break;
     case SYS_FILESIZE:
+      break;
     case SYS_READ:
+      break;
     case SYS_WRITE:
+      break;
     case SYS_SEEK:
+      break;
     case SYS_TELL:
+      break;
     case SYS_CLOSE:
+      break;
     //other sys call
     case SYS_HALT:
+      break;
     case SYS_EXIT:
+      break;
   }
   thread_exit ();
 }
 
-static pid_t exec (const char *cmd_line){
-  return process_execute(cmd_line);
+pid_t exec (const char *cmd_line){
+  tid_t tid;
+  struct thread *cur = thread_current ();
+  &cur->child_load=0;
+  tid=process_execute(cmd_line);
+  lock_acquire(&cur->child_lock);
+  while(&cur->child_load==0){
+    cond_wait(&cur->childCV);
+  }
+  if(&cur->child_load==-1){
+    tid=-1;
+  }
+  lock_release(&cur->child_lock);
+  return tid;
 }

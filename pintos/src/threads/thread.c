@@ -556,6 +556,13 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->lock_waiting);
 
 
+  //later edit
+  list_init(&t->child_list);
+  &t->child_load=0;
+  lock_init(&t->child_lock);
+  cond_init(&t->childCV);
+
+
   // Yige Driving
 
   /* Initializes semaphore for sleep to 0 so the thread will

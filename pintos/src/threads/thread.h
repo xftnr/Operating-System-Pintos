@@ -108,6 +108,16 @@ struct thread
   /* Used in timer.c */
   struct list_elem sleep_elem;       /* Sleep_list element. */
 
+  // lock for the child
+  int child_load;
+  struct lock child_lock;
+  struct condition childCV;
+
+  //child_list
+  struct list child_list;
+
+
+
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir;                /* Page directory. */
