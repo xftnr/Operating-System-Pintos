@@ -233,8 +233,12 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  list_push_back (&thread_current()->child_list, t->child_elem);  // add child thread to child list
   /* Add to ready queue. */
   thread_unblock (t);
+
+  // block parent until child is loaded
+  sema_down(&thread_current()->load_mutex);
 
   // Pengdi Driving
 
@@ -362,6 +366,9 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+
+  sema_up(&thread_current()->wait_child);
+
   schedule ();
   NOT_REACHED ();
 }
@@ -552,22 +559,30 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->old_priority = priority;
   t->magic = THREAD_MAGIC;
-  list_init (&t->lock_holding);
-  list_init (&t->lock_waiting);
-
-
-  //later edit
-  list_init(&t->child_list);
-  &t->child_load=0;
-  lock_init(&t->child_lock);
-  cond_init(&t->childCV);
-
 
   // Yige Driving
 
+  // Project 1
   /* Initializes semaphore for sleep to 0 so the thread will
      be blocked when sema_down is called in timer_sleep. */
   sema_init(&t->sleep_mutex, 0);
+
+  list_init (&t->lock_holding);
+  list_init (&t->lock_waiting);
+
+  // Project 2
+  /* Initializes semaphore for loading child to 0 so the thread will
+     be blocked when sema_down is called in exec. */
+  sema_init(&t->load_mutex, 0);
+
+  list_init(&t->child_list);
+
+  sema_init(&t->wait_child, 0);
+  sema_init(&t->page_free, 0);
+
+
+  t->parent = NULL;
+  t->is_waited = 0;
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
@@ -643,6 +658,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
     {
       ASSERT (prev != cur);
+      sema_down(&prev->page_free);
       palloc_free_page (prev);
     }
 }

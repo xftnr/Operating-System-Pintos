@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
 static void halt (void);
@@ -19,6 +20,16 @@ static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
 
+static void
+check_esp(void *esp) {
+  if (esp == NULL || !is_user_vaddr(esp) ||
+      pagedir_get_page (thread_current()->pagedir, esp) == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_current()->exit_status = -1;
+    thread_exit ();
+  }
+}
+
 void
 syscall_init (void)
 {
@@ -29,23 +40,28 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   printf ("system call!\n");
-  unit32_t esptemp = &f->esp;
+  check_esp(f->esp);
+  uint32_t *esp = (uint32_t *)f->esp;
 
-
-  // check whether is valid pointer
-  // on both esptemp and esptemp++
-  // if ()
-
-
-
-  switch (esptemp) {
-    //the exec and wait
+  switch (*esp) {
+    // Processs Control
+    case SYS_HALT:
+      halt();
+      break;
+    case SYS_EXIT:
+      check_esp(esp + 1);
+      exit (*(esp + 1))
+      break;
     case SYS_EXEC:
-      f->eax = exec((const char*) esptemp+1);
+      check_esp(esp + 1);
+      check_esp(*(esp + 1));                          // may need to cast
+      f->eax = exec(*(esp + 1));
       break;
     case SYS_WAIT:
+      check_esp(esp + 1);
+      f->eax = wait (*(esp + 1))
       break;
-    //the the file operating
+    // File System
     case SYS_CREATE:
       break;
     case SYS_REMOVE:
@@ -64,35 +80,33 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CLOSE:
       break;
-    //other sys call
-    case SYS_HALT:
-      break;
-    case SYS_EXIT:
-      break;
   }
   thread_exit ();
 }
 
-pid_t exec (const char *cmd_line){
 
+void
+halt (void){
+  shutdown_power_off();
+}
+
+void
+exit (int status) {
+  printf("%s: exit(%d)\n", thread_name(), status);
+  thread_current()->exit_status = status;
+  thread_exit();
+}
+
+pid_t
+exec (const char *cmd_line){
   tid_t tid;
-  struct thread *cur = thread_current ();
 
-  &cur->child_load=0;
-  tid=process_execute(cmd_line);
-  lock_acquire(&cur->child_lock);
-  while(&cur->child_load==0){
-
-    //need to signal!!!!!!!!!!!!!!!!!!!!!!!!!!!!.
-    cond_wait(&cur->childCV);
-  }
-  // add child to the list
-
-  if(&cur->child_load == -1){
-    tid = -1;
-  }
-  
-  lock_release(&cur->child_lock);
+  tid = process_execute(cmd_line);
 
   return tid;
+}
+
+int
+wait (pid_t pid) {
+  return process_wait(pid);
 }

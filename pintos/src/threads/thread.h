@@ -92,29 +92,31 @@ struct thread
   uint8_t *stack;              /* Saved stack pointer. */
   int priority;                /* Priority. */
 
-  int old_priority;            /* Priority before donation. */
-
-  struct list lock_holding;      /* List of locks holding. */
-  struct list lock_waiting;      /* List of locks waiting for. */
-
   struct list_elem allelem;    /* List element for all threads list. */
 
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;       /* List element. */
 
+  // Project 1
   int64_t tick_to_wake;             /* When to wake up. */
   struct semaphore sleep_mutex;     /* Used to wake up thread after sleep. */
 
   /* Used in timer.c */
   struct list_elem sleep_elem;       /* Sleep_list element. */
 
-  // lock for the child
-  int child_load;                     /*source variable*/
-  struct lock child_lock;             /*child lock*/
-  struct condition childCV;           /*child condition variable*/
+  int old_priority;            /* Priority before donation. */
 
-  //child_list
-  struct list child_list;             /*child list*/
+  struct list lock_holding;      /* List of locks holding. */
+  struct list lock_waiting;      /* List of locks waiting for. */
+
+  // Project 2
+  struct semaphore load_mutex;       /* Synchronize child loading. */
+  struct list_elem child_elem;       /* List element for child list */
+  struct list child_list;            /* List of child thread */
+  int exit_status;
+  bool is_waited;
+  struct semaphore wait_child;       /* Synchronize waiting for child. */
+  struct semaphore page_free;       /* Synchronize palloc_free_page. */
 
 
 

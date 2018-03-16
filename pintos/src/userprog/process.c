@@ -40,8 +40,10 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+  }
   return tid;
 }
 
@@ -60,11 +62,15 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  // unblock parent when child is loaded
+  sema_up(&thread_current()->load_mutex);
 
-  /* If load failed, quit. */
+  /* If load failed, remove from parent's child list, quit. */
   palloc_free_page (file_name);
-  if (!success)
+  if (!success) {
+    list_remove (thread_current()->child_elem);
     thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -86,12 +92,33 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-  while (1) {
-
+  // while (1) {
+  //
+  // }
+  // return -1;
+  bool is_direct_child = 0;
+  struct list_elem *e = NULL;
+  struct thread *child = NULL;
+  for (e = list_begin (&thread_current()->child_list);
+        e!= list_end (&thread_current()->child_list); e = list_next (e)) {
+    child = list_entry (e, struct thread, child_elem);
+    if (child->tid == child_tid) {
+      is_direct_child = 1;
+      break;
+    }
   }
-  return -1;
+  if (!is_direct_child || child->is_waited) {
+    return -1;
+  }
+  child->is_waited = 1;
+  sema_down(&child->wait_child);
+  list_remove(&chile->child_elem);
+  int result = child->exit_status;
+  sema_up(&child->page_free);
+
+  return result;
 }
 
 /* Free the current process's resources. */
