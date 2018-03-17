@@ -116,7 +116,7 @@ struct thread
   int exit_status;
   bool is_waited;
   struct semaphore wait_child;       /* Synchronize waiting for child. */
-  struct semaphore page_free;       /* Synchronize palloc_free_page. */
+  bool calling_exec;
 
 
 

@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -38,12 +39,14 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  thread_current()->calling_exec = 1;
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
+  thread_current()->calling_exec = 0;
   return tid;
 }
 
@@ -61,14 +64,19 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
   success = load (file_name, &if_.eip, &if_.esp);
+
   // unblock parent when child is loaded
   sema_up(&thread_current()->load_mutex);
 
   /* If load failed, remove from parent's child list, quit. */
   palloc_free_page (file_name);
   if (!success) {
-    list_remove (thread_current()->child_elem);
+    list_remove (&thread_current()->child_elem);
+    /* Thread terminating abnormally, change exit status */
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_current()->exit_status = -1;
     thread_exit ();
   }
 
@@ -94,10 +102,14 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  // while (1) {
-  //
-  // }
-  // return -1;
+
+// while(1) {
+//
+// }
+//
+// return 1;
+
+  // check case when thread terminated by kernel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   bool is_direct_child = 0;
   struct list_elem *e = NULL;
   struct thread *child = NULL;
@@ -114,9 +126,13 @@ process_wait (tid_t child_tid)
   }
   child->is_waited = 1;
   sema_down(&child->wait_child);
-  list_remove(&chile->child_elem);
+  list_remove(&child->child_elem);
   int result = child->exit_status;
-  sema_up(&child->page_free);
+
+ printf ("%d\n\n\n\n", result);
+
+  // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  palloc_free_page (child);
 
   return result;
 }
@@ -144,6 +160,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  sema_up(&cur->wait_child);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -266,6 +284,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }
+
+
 
   // Save arguments to the argument vector
   index = 0;
@@ -527,20 +547,20 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
       word_align = 0;
 
       // Calculate number of bytes needed to align
-      // align %= 4;
-      // if (align > 0) {
-      //   align = 4 - align;
-      // }
-      //
-      // for (i = 0; i < align; i++) {
-      //   align_esp--;
-      //   *align_esp = word_align;      // Write the number to stack
-      // }
+      align %= 4;
+      if (align > 0) {
+        align = 4 - align;
+      }
 
-      while ((esp & 0x3) != 0) {
+      for (i = 0; i < align; i++) {
         align_esp--;
         *align_esp = word_align;      // Write the number to stack
       }
+
+      // while (align_esp & 0x3) {
+      //   align_esp--;
+      //   *align_esp = word_align;      // Write the number to stack
+      // }
 
       *esp = align_esp;               // Update stack pointer
 

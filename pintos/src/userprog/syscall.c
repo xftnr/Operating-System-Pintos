@@ -50,7 +50,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_EXIT:
       check_esp(esp + 1);
-      exit (*(esp + 1))
+      exit (*(esp + 1));
       break;
     case SYS_EXEC:
       check_esp(esp + 1);
@@ -59,7 +59,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_WAIT:
       check_esp(esp + 1);
-      f->eax = wait (*(esp + 1))
+      f->eax = wait (*(esp + 1));
       break;
     // File System
     case SYS_CREATE:
@@ -73,6 +73,11 @@ syscall_handler (struct intr_frame *f)
     case SYS_READ:
       break;
     case SYS_WRITE:
+      check_esp(esp + 1);
+      check_esp(esp + 2);
+      check_esp(*(esp + 2));
+      check_esp(esp + 3);
+      f->eax = write (*(esp + 1), *(esp + 2), *(esp + 3));
       break;
     case SYS_SEEK:
       break;
@@ -109,4 +114,10 @@ exec (const char *cmd_line){
 int
 wait (pid_t pid) {
   return process_wait(pid);
+}
+
+int
+write (int fd, const void *buffer, unsigned size) {
+  putbuf (buffer, size);
+  return size;
 }

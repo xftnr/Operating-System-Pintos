@@ -212,7 +212,6 @@ thread_create (const char *name, int priority,
   if (t == NULL)
     return TID_ERROR;
 
-
   /* Initialize thread. */
   init_thread (t, name, priority);
 
@@ -233,12 +232,14 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  list_push_back (&thread_current()->child_list, t->child_elem);  // add child thread to child list
   /* Add to ready queue. */
   thread_unblock (t);
 
-  // block parent until child is loaded
-  sema_down(&thread_current()->load_mutex);
+  if (thread_current()->calling_exec) {
+    list_push_back (&thread_current()->child_list, &t->child_elem);  // add child thread to child list
+// block parent until child is loaded
+    sema_down(&t->load_mutex);
+}
 
   // Pengdi Driving
 
@@ -364,10 +365,9 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
-
-  sema_up(&thread_current()->wait_child);
 
   schedule ();
   NOT_REACHED ();
@@ -578,11 +578,11 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->child_list);
 
   sema_init(&t->wait_child, 0);
-  sema_init(&t->page_free, 0);
 
-
-  t->parent = NULL;
   t->is_waited = 0;
+  t->calling_exec = 0;
+
+  t->exit_status = -2;
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
@@ -658,8 +658,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
     {
       ASSERT (prev != cur);
-      sema_down(&prev->page_free);
-      palloc_free_page (prev);
+      // palloc_free_page (prev);
     }
 }
 
