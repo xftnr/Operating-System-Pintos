@@ -247,7 +247,7 @@ thread_create (const char *name, int priority,
   /* Always check pre-emption after thread_unblock. */
   check_preemption();
 
-  return tid;
+  return t->tid;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -583,7 +583,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->is_waited = 0;
   t->calling_exec = 0;
 
-  t->exit_status = -2;
+  t->exit_status = 0;
+
+  list_init(&t->file_list);
+
+  t->fd = 2;
+
+  t->executable = NULL;
+
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);

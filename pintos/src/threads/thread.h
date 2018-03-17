@@ -117,6 +117,10 @@ struct thread
   bool is_waited;
   struct semaphore wait_child;       /* Synchronize waiting for child. */
   bool calling_exec;
+  struct list file_list;            /* List of open file */
+  int fd;
+  struct file *executable;
+
 
 
 

@@ -85,13 +85,13 @@ start_process (void *file_name_)
 
   /* If load failed, remove from parent's child list, quit. */
   if (!success) {
-    // list_remove (&thread_current()->child_elem);
-    palloc_free_page (file_name);
+    list_remove (&thread_current()->child_elem);
+    thread_current()->tid = TID_ERROR;
 
-    // /* Thread terminating abnormally, change exit status */
-    // printf("%s: exit(%d)\n", thread_name(), -1);
-    // thread_current()->exit_status = -1;
-    // thread_exit ();
+    /* Thread terminating abnormally, change exit status */
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_current()->exit_status = -1;
+    thread_exit ();
   }
 
   /* Start the user process by simulating a return from an
@@ -116,15 +116,6 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-
-// printf("%s curr waiting \n\n", thread_current()->name);
-//
-// while(1) {
-//
-// }
-//
-// return 1;
-
   // check case when thread terminated by kernel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   bool is_direct_child = 0;
   struct list_elem *e = NULL;
@@ -146,7 +137,7 @@ process_wait (tid_t child_tid)
   int result = child->exit_status;
 
   // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  palloc_free_page (child);
+  // palloc_free_page (child);
 
   return result;
 }
@@ -174,6 +165,16 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  file_close(cur->executable);
+
+  struct list_elem *e = NULL;
+  struct thread *child = NULL;
+  for (e = list_begin (&cur->child_list);
+        e!= list_end (&cur->child_list); e = list_next (e)) {
+    child = list_entry (e, struct thread, child_elem);
+    palloc_free_page (child);
+  }
 
   sema_up(&cur->wait_child);
 }
@@ -397,9 +398,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
+
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if (success) {
+    thread_current()->executable = file;
+    file_deny_write(file);
+  } else {
+    file_close (file);
+  }
   return success;
 }
 

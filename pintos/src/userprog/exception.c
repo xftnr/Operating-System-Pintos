@@ -93,7 +93,6 @@ kill (struct intr_frame *f)
       /* Thread terminating abnormally, change exit status */
       printf("%s: exit(%d)\n", thread_name(), -1);
       thread_current()->exit_status = -1;
-
       thread_exit ();
 
     case SEL_KCSEG:
@@ -113,7 +112,6 @@ kill (struct intr_frame *f)
       /* Thread terminating abnormally, change exit status */
       printf("%s: exit(%d)\n", thread_name(), -1);
       thread_current()->exit_status = -1;
-
       thread_exit ();
     }
 }
