@@ -39,7 +39,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  printf ("system call!\n");
   check_esp(f->esp);
   uint32_t *esp = (uint32_t *)f->esp;
 
@@ -85,8 +84,9 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CLOSE:
       break;
+    default:
+      printf("System Call not implemented.\n");
   }
-  thread_exit ();
 }
 
 
@@ -105,9 +105,7 @@ exit (int status) {
 pid_t
 exec (const char *cmd_line){
   tid_t tid;
-
   tid = process_execute(cmd_line);
-
   return tid;
 }
 

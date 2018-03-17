@@ -237,9 +237,10 @@ thread_create (const char *name, int priority,
 
   if (thread_current()->calling_exec) {
     list_push_back (&thread_current()->child_list, &t->child_elem);  // add child thread to child list
-// block parent until child is loaded
+    check_preemption();
+    // block parent until child is loaded
     sema_down(&t->load_mutex);
-}
+  }
 
   // Pengdi Driving
 

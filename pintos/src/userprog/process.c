@@ -39,9 +39,22 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+
+  char s[128];                /* Temperary string to hold the command line */
+  char *token = NULL;         /* Tokenized argument */
+  char *save_ptr = NULL;      /* Saved position in String */
+  int index;                  /* Index in the array*/
+
+
+  // Save arguments to the argument vector
+  index = 0;
+  strlcpy(s, file_name, strlen(file_name) + 1);
+  token = strtok_r (s, " ", &save_ptr);
+
+
   thread_current()->calling_exec = 1;
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
@@ -71,13 +84,14 @@ start_process (void *file_name_)
   sema_up(&thread_current()->load_mutex);
 
   /* If load failed, remove from parent's child list, quit. */
-  palloc_free_page (file_name);
   if (!success) {
-    list_remove (&thread_current()->child_elem);
-    /* Thread terminating abnormally, change exit status */
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_current()->exit_status = -1;
-    thread_exit ();
+    // list_remove (&thread_current()->child_elem);
+    palloc_free_page (file_name);
+
+    // /* Thread terminating abnormally, change exit status */
+    // printf("%s: exit(%d)\n", thread_name(), -1);
+    // thread_current()->exit_status = -1;
+    // thread_exit ();
   }
 
   /* Start the user process by simulating a return from an
@@ -103,6 +117,8 @@ int
 process_wait (tid_t child_tid)
 {
 
+// printf("%s curr waiting \n\n", thread_current()->name);
+//
 // while(1) {
 //
 // }
@@ -128,8 +144,6 @@ process_wait (tid_t child_tid)
   sema_down(&child->wait_child);
   list_remove(&child->child_elem);
   int result = child->exit_status;
-
- printf ("%d\n\n\n\n", result);
 
   // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   palloc_free_page (child);
@@ -284,8 +298,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }
-
-
 
   // Save arguments to the argument vector
   index = 0;
@@ -599,7 +611,8 @@ setup_stack (void **esp, const char *file_name, int argc, char **argv)
       *fake_ptr_esp = (void *) 0;     /* Write fake return address 0 */
       *esp = fake_ptr_esp;
 
-      hex_dump ((uintptr_t)*esp, *esp, PHYS_BASE - *esp, 1);
+      // hex_dump ((uintptr_t)*esp, *esp, PHYS_BASE - *esp, 1);
+
     }  else {
       palloc_free_page (kpage);
     }
