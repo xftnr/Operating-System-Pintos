@@ -80,19 +80,23 @@ start_process (void *file_name_)
 
   success = load (file_name, &if_.eip, &if_.esp);
 
-  // unblock parent when child is loaded
-  sema_up(&thread_current()->load_mutex);
+
 
   /* If load failed, remove from parent's child list, quit. */
   if (!success) {
-    list_remove (&thread_current()->child_elem);
     thread_current()->tid = TID_ERROR;
+
+    // unblock parent when child is loaded
+    sema_up(&thread_current()->load_mutex);
 
     /* Thread terminating abnormally, change exit status */
     printf("%s: exit(%d)\n", thread_name(), -1);
     thread_current()->exit_status = -1;
     thread_exit ();
   }
+
+  // unblock parent when child is loaded
+  sema_up(&thread_current()->load_mutex);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -116,6 +120,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  if (child_tid == -1) {
+    return -1;
+  }
+
   // check case when thread terminated by kernel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   bool is_direct_child = 0;
   struct list_elem *e = NULL;
@@ -128,16 +136,18 @@ process_wait (tid_t child_tid)
       break;
     }
   }
-  if (!is_direct_child || child->is_waited) {
+  if (!is_direct_child || child->is_waited == 1) {
+
+printf("?  is child: %d   waiting again %d\n\n", is_direct_child, child->is_waited);
     return -1;
   }
   child->is_waited = 1;
   sema_down(&child->wait_child);
-  list_remove(&child->child_elem);
   int result = child->exit_status;
 
   // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // palloc_free_page (child);
+// list_remove(&child->child_elem);
+// palloc_free_page (child);
 
   return result;
 }
@@ -168,15 +178,7 @@ process_exit (void)
 
   file_close(cur->executable);
 
-  struct list_elem *e = NULL;
-  struct thread *child = NULL;
-  for (e = list_begin (&cur->child_list);
-        e!= list_end (&cur->child_list); e = list_next (e)) {
-    child = list_entry (e, struct thread, child_elem);
-    palloc_free_page (child);
-  }
-
-  sema_up(&cur->wait_child);
+  // sema_up(&cur->wait_child);
 }
 
 /* Sets up the CPU for running user code in the current

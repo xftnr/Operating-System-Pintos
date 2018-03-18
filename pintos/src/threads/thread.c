@@ -19,6 +19,9 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "filesys/file.h"
+
+
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -237,9 +240,17 @@ thread_create (const char *name, int priority,
 
   if (thread_current()->calling_exec) {
     list_push_back (&thread_current()->child_list, &t->child_elem);  // add child thread to child list
+
     check_preemption();
     // block parent until child is loaded
     sema_down(&t->load_mutex);
+    if (t->tid == TID_ERROR) {
+list_remove(&t->child_elem);
+      t->child_elem.prev = NULL;
+      t->child_elem.next = NULL;
+
+    }
+
   }
 
   // Pengdi Driving
@@ -367,8 +378,43 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
 
+
+  struct list_elem *e = NULL;
+  struct thread *child = NULL;
+  for (e = list_begin (&thread_current()->child_list);
+  e!= list_end (&thread_current()->child_list); e = list_next (e)) {
+    child = list_entry (e, struct thread, child_elem);
+    e = e->prev;
+    list_remove(&child->child_elem);
+
+    if (child->status == THREAD_DYING) {
+      palloc_free_page (child);
+    } else {
+      child->child_elem.prev = NULL;
+      child->child_elem.next = NULL;
+    }
+    // printf("freed\n\n\n");
+  }
+
+  struct lock *l = NULL;
+  for (e = list_begin (&thread_current()->lock_holding);
+        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+    l = list_entry (e, struct lock, holding_elem);
+    lock_release(l);
+  }
+
+
+  struct file_info *f = NULL;
+  for (e = list_begin (&thread_current()->file_list);
+        e!= list_end (&thread_current()->file_list); e = list_next (e)) {
+    f = list_entry (e, struct file_info, file_elem);
+    file_close(f->file_temp);
+    free(f);
+  }
+
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+
 
   schedule ();
   NOT_REACHED ();
@@ -663,11 +709,15 @@ thread_schedule_tail (struct thread *prev)
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
-  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
-    {
-      ASSERT (prev != cur);
-      // palloc_free_page (prev);
-    }
+     if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
+     {
+       ASSERT (prev != cur);
+       sema_up(&prev->wait_child);
+
+       if (prev->child_elem.prev == NULL || prev->child_elem.next == NULL) {
+         palloc_free_page(prev);
+       }
+     }
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and

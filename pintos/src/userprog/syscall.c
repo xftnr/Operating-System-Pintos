@@ -227,10 +227,7 @@ open (const char *file){
 int
 filesize (int fd) {
 
-
-  // lock_acquire(&file_lock);
-
-
+  lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
@@ -239,13 +236,13 @@ filesize (int fd) {
   struct file *cur = cur_info->file_temp;
 
   int result = file_length(cur);
-  // lock_release(&file_lock);
+  lock_release(&file_lock);
   return result;
 }
 
 int
 read (int fd, void *buffer, unsigned size) {
-  // lock_acquire(&file_lock);
+  lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
@@ -254,7 +251,7 @@ read (int fd, void *buffer, unsigned size) {
   struct file *cur = cur_info->file_temp;
 
   int result = file_read (cur, buffer, size);
-  // lock_release(&file_lock);
+  lock_release(&file_lock);
   return result;
 }
 

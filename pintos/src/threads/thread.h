@@ -114,7 +114,7 @@ struct thread
   struct list_elem child_elem;       /* List element for child list */
   struct list child_list;            /* List of child thread */
   int exit_status;
-  bool is_waited;
+  int is_waited;
   struct semaphore wait_child;       /* Synchronize waiting for child. */
   bool calling_exec;
   struct list file_list;            /* List of open file */
