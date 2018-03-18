@@ -177,24 +177,7 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
-    struct list_elem *e = NULL;
 
-    struct lock *l = NULL;
-    for (e = list_begin (&thread_current()->lock_holding);
-          e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
-      l = list_entry (e, struct lock, holding_elem);
-      lock_release(l);
-    }
-
-    struct file_info *f = NULL;
-    for (e = list_begin (&thread_current()->file_list);
-          e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-      f = list_entry (e, struct file_info, file_elem);
-      // file_close(f->file_temp);
-      // free(f);
-    }
-
-  file_close(cur->executable);
 
   // sema_up(&cur->wait_child);
 }

@@ -6,7 +6,6 @@
 
 void syscall_init (void);
 
-
 struct file_info
 {
     int fd;                            /* File descriptor. */

@@ -19,6 +19,8 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "filesys/file.h"
+#include "userprog/syscall.h"
 
 
 #endif
@@ -395,6 +397,25 @@ thread_exit (void)
     // printf("freed\n\n\n");
   }
 
+  struct lock *l = NULL;
+  for (e = list_begin (&thread_current()->lock_holding);
+        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+    l = list_entry (e, struct lock, holding_elem);
+    lock_release(l);
+  }
+
+  struct file_info *f = NULL;
+  for (e = list_begin (&thread_current()->file_list);
+        e!= list_end (&thread_current()->file_list); e = list_next (e)) {
+    f = list_entry (e, struct file_info, file_elem);
+    e = e->prev;
+    list_remove(&f->file_elem);
+    file_close(f->file_temp);
+    free(f);
+  }
+
+  file_close(thread_current ()->executable);
+
 
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
@@ -621,6 +642,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->executable = NULL;
 
+t->child_elem.prev = NULL;
+t->child_elem.next = NULL;
+
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
@@ -696,10 +720,11 @@ thread_schedule_tail (struct thread *prev)
      if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
      {
        ASSERT (prev != cur);
-       sema_up(&prev->wait_child);
 
-       if (prev->child_elem.prev == NULL || prev->child_elem.next == NULL) {
+       if (prev->child_elem.prev == NULL && prev->child_elem.next == NULL) {
          palloc_free_page(prev);
+       } else {
+         sema_up(&prev->wait_child);
        }
      }
 }

@@ -209,7 +209,7 @@ remove (const char *file) {
 int
 open (const char *file){
   lock_acquire(&file_lock);
-  struct file_info *f = malloc(sizeof(struct file_info));
+  struct file_info *f = (struct file_info*)malloc(sizeof(struct file_info));
   f->file_temp = filesys_open(file);
   if (f->file_temp == NULL) {
     free(f);
@@ -299,8 +299,9 @@ close (int fd) {
   }
   struct file *cur = cur_info->file_temp;
   list_remove(&cur_info->file_elem);
-  free(cur_info);
 
   file_close (cur);
+  free(cur_info);
+
   lock_release(&file_lock);
 }
