@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -17,6 +18,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
+
 
 
 static thread_func start_process NO_RETURN;
@@ -136,9 +139,7 @@ process_wait (tid_t child_tid)
       break;
     }
   }
-  if (!is_direct_child || child->is_waited == 1) {
-
-printf("?  is child: %d   waiting again %d\n\n", is_direct_child, child->is_waited);
+  if (!is_direct_child || child->is_waited ) {
     return -1;
   }
   child->is_waited = 1;
@@ -174,6 +175,23 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+    }
+
+    struct list_elem *e = NULL;
+
+    struct lock *l = NULL;
+    for (e = list_begin (&thread_current()->lock_holding);
+          e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+      l = list_entry (e, struct lock, holding_elem);
+      lock_release(l);
+    }
+
+    struct file_info *f = NULL;
+    for (e = list_begin (&thread_current()->file_list);
+          e!= list_end (&thread_current()->file_list); e = list_next (e)) {
+      f = list_entry (e, struct file_info, file_elem);
+      // file_close(f->file_temp);
+      // free(f);
     }
 
   file_close(cur->executable);

@@ -4,7 +4,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include <list.h>
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
@@ -26,12 +25,6 @@ static void close (int fd);
 
 struct lock file_lock;
 
-struct file_info
-{
-    int fd;                            /* File descriptor. */
-    struct file *file_temp;                  /* Associated file. */
-    struct list_elem file_elem;        /* List element for file list. */
-};
 
 
 static void
@@ -157,8 +150,12 @@ exit (int status) {
 
 pid_t
 exec (const char *cmd_line){
+  lock_acquire(&file_lock);
+
   tid_t tid;
   tid = process_execute(cmd_line);
+  lock_release(&file_lock);
+
   return tid;
 }
 
@@ -169,14 +166,17 @@ wait (pid_t pid) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+  lock_acquire(&file_lock);
   if (fd == 1) {
     putbuf (buffer, size);
+    lock_release(&file_lock);
+
     return size;
   } else if (fd != 0) {
-    lock_acquire(&file_lock);
 
     struct file_info *cur_info = get_file(fd);
     if (cur_info == NULL) {
+      lock_release(&file_lock);
       exit(-1);
     }
 
@@ -213,6 +213,7 @@ open (const char *file){
   f->file_temp = filesys_open(file);
   if (f->file_temp == NULL) {
     free(f);
+    lock_release(&file_lock);
     return -1;
   }
 
@@ -226,11 +227,11 @@ open (const char *file){
 
 int
 filesize (int fd) {
-
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    lock_release(&file_lock);
     exit(-1);
   }
   struct file *cur = cur_info->file_temp;
@@ -246,6 +247,7 @@ read (int fd, void *buffer, unsigned size) {
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    lock_release(&file_lock);
     exit(-1);
   }
   struct file *cur = cur_info->file_temp;
@@ -261,6 +263,7 @@ seek (int fd, unsigned position) {
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    lock_release(&file_lock);
     exit(-1);
   }
   struct file *cur = cur_info->file_temp;
@@ -275,6 +278,7 @@ tell (int fd) {
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    lock_release(&file_lock);
     exit(-1);
   }
   struct file *cur = cur_info->file_temp;
@@ -290,6 +294,7 @@ close (int fd) {
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    lock_release(&file_lock);
     exit(-1);
   }
   struct file *cur = cur_info->file_temp;

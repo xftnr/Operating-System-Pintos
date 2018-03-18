@@ -19,7 +19,6 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
-#include "filesys/file.h"
 
 
 #endif
@@ -245,7 +244,7 @@ thread_create (const char *name, int priority,
     // block parent until child is loaded
     sema_down(&t->load_mutex);
     if (t->tid == TID_ERROR) {
-list_remove(&t->child_elem);
+      list_remove(&t->child_elem);
       t->child_elem.prev = NULL;
       t->child_elem.next = NULL;
 
@@ -396,21 +395,6 @@ thread_exit (void)
     // printf("freed\n\n\n");
   }
 
-  struct lock *l = NULL;
-  for (e = list_begin (&thread_current()->lock_holding);
-        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
-    l = list_entry (e, struct lock, holding_elem);
-    lock_release(l);
-  }
-
-
-  struct file_info *f = NULL;
-  for (e = list_begin (&thread_current()->file_list);
-        e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-    f = list_entry (e, struct file_info, file_elem);
-    file_close(f->file_temp);
-    free(f);
-  }
 
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
