@@ -100,7 +100,7 @@ start_process (void *file_name_)
 
   // unblock parent when child is loaded
   sema_up(&thread_current()->load_mutex);
-
+  palloc_free_page(file_name);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -179,7 +179,7 @@ process_exit (void)
 
 
 
-  // sema_up(&cur->wait_child);
+  sema_up(&cur->wait_child);
 }
 
 /* Sets up the CPU for running user code in the current
