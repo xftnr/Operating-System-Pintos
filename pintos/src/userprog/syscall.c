@@ -1,11 +1,15 @@
 #include "userprog/syscall.h"
+#include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "devices/shutdown.h"
 
 
 static void syscall_handler (struct intr_frame *);
@@ -24,8 +28,6 @@ static unsigned tell (int fd);
 static void close (int fd);
 
 struct lock file_lock;
-
-
 
 static void
 check_esp(void *esp) {
@@ -61,7 +63,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  check_esp(f->esp);
+  check_esp((void *)(f->esp));
   uint32_t *esp = (uint32_t *)f->esp;
 
   switch (*esp) {
@@ -70,65 +72,65 @@ syscall_handler (struct intr_frame *f)
       halt();
       break;
     case SYS_EXIT:
-      check_esp(esp + 1);
-      exit(*(esp + 1));
+      check_esp((void *)(esp + 1));
+      exit((int)*(esp + 1));
       break;
     case SYS_EXEC:
-      check_esp(esp + 1);
-      check_esp(*(esp + 1));                          // may need to cast
-      f->eax = exec(*(esp + 1));
+      check_esp((void *)(esp + 1));
+      check_esp((void *)*(esp + 1));
+      f->eax = exec((const char *)*(esp + 1));
       break;
     case SYS_WAIT:
-      check_esp(esp + 1);
-      f->eax = wait (*(esp + 1));
+      check_esp((void *)(esp + 1));
+      f->eax = wait ((pid_t)*(esp + 1));
       break;
     // File System
     case SYS_CREATE:
-      check_esp(esp + 1);
+      check_esp((void *)(esp + 1));
       check_esp(*(esp + 1));
-      check_esp(esp + 2);
-      f->eax = create(*(esp + 1), *(esp + 2));
+      check_esp((void *)(esp + 2));
+      f->eax = create((const char *)*(esp + 1), (unsigned)*(esp + 2));
       break;
     case SYS_REMOVE:
-      check_esp(esp + 1);
+      check_esp((void *)(esp + 1));
       check_esp(*(esp + 1));
-      f->eax = remove(*(esp + 1));
+      f->eax = remove((const char *)*(esp + 1));
       break;
     case SYS_OPEN:
-      check_esp(esp + 1);
+      check_esp((void *)(esp + 1));
       check_esp(*(esp + 1));
-      f->eax = open(*(esp + 1));
+      f->eax = open((const char *)*(esp + 1));
       break;
     case SYS_FILESIZE:
-      check_esp(esp + 1);
-      f->eax = filesize(*(esp + 1));
+      check_esp((void *)(esp + 1));
+      f->eax = filesize((int)*(esp + 1));
       break;
     case SYS_READ:
-      check_esp(esp + 1);
-      check_esp(esp + 2);
-      check_esp(*(esp + 2));
-      check_esp(esp + 3);
-      f->eax = read (*(esp + 1), *(esp + 2), *(esp + 3));
+      check_esp((void *)(esp + 1));
+      check_esp((void *)(esp + 2));
+      check_esp((void *)*(esp + 2));
+      check_esp((void *)(esp + 3));
+      f->eax = read ((int)*(esp + 1), (void *)*(esp + 2), (unsigned)*(esp + 3));
       break;
     case SYS_WRITE:
-      check_esp(esp + 1);
-      check_esp(esp + 2);
-      check_esp(*(esp + 2));
-      check_esp(esp + 3);
-      f->eax = write (*(esp + 1), *(esp + 2), *(esp + 3));
+      check_esp((void *)(esp + 1));
+      check_esp((void *)(esp + 2));
+      check_esp((void *)*(esp + 2));
+      check_esp((void *)(esp + 3));
+      f->eax = write ((int)*(esp + 1), (const void *)*(esp + 2), (unsigned)*(esp + 3));
       break;
     case SYS_SEEK:
-      check_esp(esp + 1);
-      check_esp(esp + 2);
-      seek (*(esp + 1), *(esp + 2));
+      check_esp((void *)(esp + 1));
+      check_esp((void *)(esp + 2));
+      seek ((int)*(esp + 1), (unsigned)*(esp + 2));
       break;
     case SYS_TELL:
-      check_esp(esp + 1);
-      f->eax = tell(*(esp + 1));
+      check_esp((void *)(esp + 1));
+      f->eax = tell((int)*(esp + 1));
       break;
     case SYS_CLOSE:
-      check_esp(esp + 1);
-      close(*(esp + 1));
+      check_esp((void *)(esp + 1));
+      close((int)*(esp + 1));
       break;
     default:
       printf("System Call not implemented.\n");
@@ -302,6 +304,14 @@ close (int fd) {
 
   file_close (cur);
   free(cur_info);
+
+  lock_release(&file_lock);
+}
+
+close_file (struct file *file) {
+  lock_acquire(&file_lock);
+
+  file_close (file);
 
   lock_release(&file_lock);
 }

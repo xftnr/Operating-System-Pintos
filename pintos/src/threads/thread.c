@@ -19,7 +19,6 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
-#include "filesys/file.h"
 #include "userprog/syscall.h"
 
 
@@ -410,11 +409,11 @@ thread_exit (void)
     f = list_entry (e, struct file_info, file_elem);
     e = e->prev;
     list_remove(&f->file_elem);
-    file_close(f->file_temp);
+    close_file(f->file_temp);
     free(f);
   }
 
-  file_close(thread_current ()->executable);
+  close_file(thread_current ()->executable);
 
 
   list_remove (&thread_current()->allelem);

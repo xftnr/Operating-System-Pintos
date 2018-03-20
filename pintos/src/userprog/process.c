@@ -101,6 +101,7 @@ start_process (void *file_name_)
   // unblock parent when child is loaded
   sema_up(&thread_current()->load_mutex);
   palloc_free_page(file_name);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -261,7 +262,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, const char *file_name, int argc, char **argv);
+static bool setup_stack (void **esp, int argc, char **argv);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -311,7 +312,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
     argv[index] = token;
     index++;
   }
-
 
   file = filesys_open(argv[0]);
   if (file == NULL)
@@ -393,7 +393,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, file_name, argc, argv))
+  if (!setup_stack (esp, argc, argv))
     goto done;
 
   /* Start address. */
@@ -528,7 +528,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, const char *file_name, int argc, char **argv)
+setup_stack (void **esp, int argc, char **argv)
 {
   uint8_t *kpage;
   bool success = false;
