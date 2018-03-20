@@ -140,11 +140,11 @@ process_wait (tid_t child_tid)
       break;
     }
   }
-  if (!is_direct_child || child->is_waited ) {
+  if (!is_direct_child || child->waited_once ) {
     return -1;
   }
-  child->is_waited = 1;
-  sema_down(&child->wait_child);
+  child->waited_once = true;
+  sema_down(&child->wait_mutex);
   int result = child->exit_status;
 
   // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -180,7 +180,7 @@ process_exit (void)
 
 
 
-  sema_up(&cur->wait_child);
+  sema_up(&cur->wait_mutex);
 }
 
 /* Sets up the CPU for running user code in the current

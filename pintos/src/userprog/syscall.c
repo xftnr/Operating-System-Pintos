@@ -211,14 +211,14 @@ remove (const char *file) {
 int
 open (const char *file){
   lock_acquire(&file_lock);
-  struct file_info *f = (struct file_info*)malloc(sizeof(struct file_info));
-  f->file_temp = filesys_open(file);
-  if (f->file_temp == NULL) {
-    free(f);
+  struct file *file = filesys_open(file);
+
+  if (file == NULL) {
     lock_release(&file_lock);
     return -1;
   }
-
+  struct file_info *f = (struct file_info*)malloc(sizeof(struct file_info));
+  f->file_temp = filesys_open(file);
   f->fd = thread_current()->fd;
   thread_current()->fd++;
 

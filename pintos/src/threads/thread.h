@@ -97,31 +97,33 @@ struct thread
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;       /* List element. */
 
-  // Project 1
+  /* Project 1. */
   int64_t tick_to_wake;             /* When to wake up. */
   struct semaphore sleep_mutex;     /* Used to wake up thread after sleep. */
 
   /* Used in timer.c */
-  struct list_elem sleep_elem;       /* Sleep_list element. */
+  struct list_elem sleep_elem;      /* Sleep_list element. */
 
-  int old_priority;            /* Priority before donation. */
+  int old_priority;                 /* Priority before donation. */
 
-  struct list lock_holding;      /* List of locks holding. */
-  struct list lock_waiting;      /* List of locks waiting for. */
+  struct list lock_holding;         /* List of locks holding. */
+  struct list lock_waiting;         /* List of locks waiting for. */
 
-  // Project 2
-  struct semaphore load_mutex;       /* Synchronize child loading. */
-  struct list_elem child_elem;       /* List element for child list */
-  struct list child_list;            /* List of child thread */
-  int exit_status;
-  int is_waited;
-  struct semaphore wait_child;       /* Synchronize waiting for child. */
-  bool calling_exec;
-  struct list file_list;            /* List of open file */
-  int fd;
-  struct file *executable;
+  /* Project 2. */
+  struct list file_list;           /* List of open file */
+  int fd;                          /* Next fd for open file*/
+  struct file *executable;         /* Executable file for this thread. */
 
+  /* As parent thread. */
+  bool calling_exec;               /* Whether or not creating a new child. */
+  struct list child_list;          /* List of child thread. */
 
+  /* As child thread. */
+  struct semaphore load_mutex;     /* Synchronize loading this thread. */
+  struct list_elem child_elem;     /* List element for child list. */
+  bool waited_once;                /* Whether has already been waited once. */
+  struct semaphore wait_mutex;     /* Synchronize waiting for this thread. */
+  int exit_status;                 /* Status of this thread when exited. */
 
 
 #ifdef USERPROG

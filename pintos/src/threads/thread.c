@@ -17,10 +17,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/syscall.h"
-
+#ifdef USERPROG
 
 #endif
 
@@ -238,19 +237,20 @@ thread_create (const char *name, int priority,
   /* Add to ready queue. */
   thread_unblock (t);
 
-  if (thread_current()->calling_exec) {
-    list_push_back (&thread_current()->child_list, &t->child_elem);  // add child thread to child list
+  // Wei Po driving
 
-    check_preemption();
-    // block parent until child is loaded
-    sema_down(&t->load_mutex);
+  if (thread_current()->calling_exec) {
+    /* Thread t is a child thread of current thread. */
+    list_push_back (&thread_current()->child_list, &t->child_elem);
+
+    sema_down(&t->load_mutex);      /* Blocks parent until child is loaded. */
+
     if (t->tid == TID_ERROR) {
+      /* Child load failed, remove from child list. */
       list_remove(&t->child_elem);
       t->child_elem.prev = NULL;
       t->child_elem.next = NULL;
-
     }
-
   }
 
   // Pengdi Driving
@@ -367,6 +367,11 @@ thread_tid (void)
 void
 thread_exit (void)
 {
+  struct list_elem *e = NULL;       /* List elements. */
+  struct thread *child = NULL;      /* Child threads. */
+  struct lock *l = NULL;            /* Locks holds. */
+  struct file_info *f = NULL;       /* Open files. */
+
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
@@ -378,32 +383,33 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
 
+  // Pengdi Driving
 
-  struct list_elem *e = NULL;
-  struct thread *child = NULL;
+  /* Destroys current thread's relationship with all its child threads. */
   for (e = list_begin (&thread_current()->child_list);
-  e!= list_end (&thread_current()->child_list); e = list_next (e)) {
+        e!= list_end (&thread_current()->child_list); e = list_next (e)) {
     child = list_entry (e, struct thread, child_elem);
     e = e->prev;
     list_remove(&child->child_elem);
 
     if (child->status == THREAD_DYING) {
+      /* Child exited. Free child resources. */
       palloc_free_page (child);
     } else {
+      /* Child is alive, remove relationship. Child becomes orphan. */
       child->child_elem.prev = NULL;
       child->child_elem.next = NULL;
     }
-    // printf("freed\n\n\n");
   }
 
-  struct lock *l = NULL;
+  /* Releases all locks current thread holds. */
   for (e = list_begin (&thread_current()->lock_holding);
         e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
     l = list_entry (e, struct lock, holding_elem);
     lock_release(l);
   }
 
-  struct file_info *f = NULL;
+  /* Closes open files of current thread and frees resources. */
   for (e = list_begin (&thread_current()->file_list);
         e!= list_end (&thread_current()->file_list); e = list_next (e)) {
     f = list_entry (e, struct file_info, file_elem);
@@ -415,10 +421,8 @@ thread_exit (void)
 
   close_file(thread_current ()->executable);
 
-
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
-
 
   schedule ();
   NOT_REACHED ();
@@ -622,28 +626,30 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->lock_waiting);
 
   // Project 2
-  /* Initializes semaphore for loading child to 0 so the thread will
-     be blocked when sema_down is called in exec. */
-  sema_init(&t->load_mutex, 0);
+  list_init(&t->file_list);
+  t->fd = 2;                     /* 0 and 1 are reserved for the console. */
+  t->executable = NULL;          /* File will be added during load. */
 
+  t->calling_exec = false;
   list_init(&t->child_list);
 
-  sema_init(&t->wait_child, 0);
+  t->child_elem.prev = NULL;
+  t->child_elem.next = NULL;
 
-  t->is_waited = 0;
-  t->calling_exec = 0;
+  /* Initializes semaphore for loading this thread to 0 so
+  the parent thread can wait for this thread to be loaded
+  after unblocking this thread in thread_create. */
+  sema_init(&t->load_mutex, 0);
 
+  /* Initializes semaphore for waiting for this thread to 0 so
+  the parent thread can wait for this thread to exit. */
+  sema_init(&t->wait_mutex, 0);
+
+  /* Becomes true when parent waits for this thread for the first time. */
+  t->waited_once = false;
+
+  /* Updated when thread calles exit() or terminate due to exception. */
   t->exit_status = 0;
-
-  list_init(&t->file_list);
-
-  t->fd = 2;
-
-  t->executable = NULL;
-
-t->child_elem.prev = NULL;
-t->child_elem.next = NULL;
-
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
@@ -723,7 +729,7 @@ thread_schedule_tail (struct thread *prev)
        if (prev->child_elem.prev == NULL && prev->child_elem.next == NULL) {
          palloc_free_page(prev);
        } else {
-         sema_up(&prev->wait_child);
+         sema_up(&prev->wait_mutex);
        }
      }
 }
