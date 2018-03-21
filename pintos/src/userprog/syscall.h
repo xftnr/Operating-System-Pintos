@@ -1,4 +1,5 @@
 #include <list.h>
+#include "filesys/file.h"
 
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H

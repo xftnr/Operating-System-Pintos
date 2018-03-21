@@ -11,7 +11,6 @@
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 
-
 static void syscall_handler (struct intr_frame *);
 static void halt (void);
 static void exit (int status);
@@ -87,18 +86,18 @@ syscall_handler (struct intr_frame *f)
     // File System
     case SYS_CREATE:
       check_esp((void *)(esp + 1));
-      check_esp(*(esp + 1));
+      check_esp((void *)*(esp + 1));
       check_esp((void *)(esp + 2));
       f->eax = create((const char *)*(esp + 1), (unsigned)*(esp + 2));
       break;
     case SYS_REMOVE:
       check_esp((void *)(esp + 1));
-      check_esp(*(esp + 1));
+      check_esp((void *)*(esp + 1));
       f->eax = remove((const char *)*(esp + 1));
       break;
     case SYS_OPEN:
       check_esp((void *)(esp + 1));
-      check_esp(*(esp + 1));
+      check_esp((void *)*(esp + 1));
       f->eax = open((const char *)*(esp + 1));
       break;
     case SYS_FILESIZE:
@@ -211,20 +210,20 @@ remove (const char *file) {
 int
 open (const char *file){
   lock_acquire(&file_lock);
-  struct file *file = filesys_open(file);
+  struct file *f = filesys_open(file);
 
-  if (file == NULL) {
+  if (f == NULL) {
     lock_release(&file_lock);
     return -1;
   }
-  struct file_info *f = (struct file_info*)malloc(sizeof(struct file_info));
-  f->file_temp = filesys_open(file);
-  f->fd = thread_current()->fd;
+  struct file_info *f_i = (struct file_info*)malloc(sizeof(struct file_info));
+  f_i->file_temp = f;
+  f_i->fd = thread_current()->fd;
   thread_current()->fd++;
 
-  list_push_back (&thread_current()->file_list, &f->file_elem);
+  list_push_back (&thread_current()->file_list, &f_i->file_elem);
   lock_release(&file_lock);
-  return f->fd;
+  return f_i->fd;
 }
 
 int
@@ -308,6 +307,7 @@ close (int fd) {
   lock_release(&file_lock);
 }
 
+void
 close_file (struct file *file) {
   lock_acquire(&file_lock);
 

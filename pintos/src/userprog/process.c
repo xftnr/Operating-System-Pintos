@@ -42,27 +42,29 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-
+  /* Retrieve executable file name from command line. */
   char s[128];                /* Temperary string to hold the command line */
   char *token = NULL;         /* Tokenized argument */
   char *save_ptr = NULL;      /* Saved position in String */
   int index;                  /* Index in the array*/
-
 
   // Save arguments to the argument vector
   index = 0;
   strlcpy(s, file_name, strlen(file_name) + 1);
   token = strtok_r (s, " ", &save_ptr);
 
+  /* Sets current thread's calling_exec to true so the created thread
+  can be added to current thread's child list. */
+  thread_current()->calling_exec = true;
 
-  thread_current()->calling_exec = 1;
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
-  thread_current()->calling_exec = 0;
+
+  thread_current()->calling_exec = false;
   return tid;
 }
 
@@ -83,23 +85,22 @@ start_process (void *file_name_)
 
   success = load (file_name, &if_.eip, &if_.esp);
 
-
-
   /* If load failed, remove from parent's child list, quit. */
   if (!success) {
     thread_current()->tid = TID_ERROR;
 
-    // unblock parent when child is loaded
+    /* Unblocks parent when child failed to load. */
     sema_up(&thread_current()->load_mutex);
 
-    /* Thread terminating abnormally, change exit status */
+    /* Thread terminating abnormally, change exit status, quit. */
     printf("%s: exit(%d)\n", thread_name(), -1);
     thread_current()->exit_status = -1;
     thread_exit ();
   }
 
-  // unblock parent when child is loaded
+  /* Unblocks parent when child is loaded. */
   sema_up(&thread_current()->load_mutex);
+
   palloc_free_page(file_name);
 
   /* Start the user process by simulating a return from an
@@ -124,33 +125,36 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  if (child_tid == -1) {
-    return -1;
-  }
+  /* Whether thread TID is a direct child of current thread*/
+  bool is_direct_child = false;
 
-  // check case when thread terminated by kernel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  bool is_direct_child = 0;
-  struct list_elem *e = NULL;
-  struct thread *child = NULL;
+  struct list_elem *e = NULL;       /* List elements. */
+  struct thread *child = NULL;      /* Child threads. */
+
+  /* Check whether thread with child_tid is a
+  direct child of the current thread. */
   for (e = list_begin (&thread_current()->child_list);
         e!= list_end (&thread_current()->child_list); e = list_next (e)) {
     child = list_entry (e, struct thread, child_elem);
     if (child->tid == child_tid) {
-      is_direct_child = 1;
+      is_direct_child = true;
       break;
     }
   }
+
   if (!is_direct_child || child->waited_once ) {
     return -1;
   }
+
+  /* Set child thread's waited to true so it will not be waited again.
+  The parent thread will return -1 immediately next time. */
   child->waited_once = true;
+
+  /* Wait for child to exit. If child has already exited,
+  current thread will immediately continue. */
   sema_down(&child->wait_mutex);
+
   int result = child->exit_status;
-
-  // thread.c thread_exit schedule_tail !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// list_remove(&child->child_elem);
-// palloc_free_page (child);
-
   return result;
 }
 
@@ -177,10 +181,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-
-
-
-  sema_up(&cur->wait_mutex);
 }
 
 /* Sets up the CPU for running user code in the current

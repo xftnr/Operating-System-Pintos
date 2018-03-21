@@ -237,8 +237,6 @@ thread_create (const char *name, int priority,
   /* Add to ready queue. */
   thread_unblock (t);
 
-  // Wei Po driving
-
   if (thread_current()->calling_exec) {
     /* Thread t is a child thread of current thread. */
     list_push_back (&thread_current()->child_list, &t->child_elem);
@@ -383,8 +381,6 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
 
-  // Pengdi Driving
-
   /* Destroys current thread's relationship with all its child threads. */
   for (e = list_begin (&thread_current()->child_list);
         e!= list_end (&thread_current()->child_list); e = list_next (e)) {
@@ -402,13 +398,6 @@ thread_exit (void)
     }
   }
 
-  /* Releases all locks current thread holds. */
-  for (e = list_begin (&thread_current()->lock_holding);
-        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
-    l = list_entry (e, struct lock, holding_elem);
-    lock_release(l);
-  }
-
   /* Closes open files of current thread and frees resources. */
   for (e = list_begin (&thread_current()->file_list);
         e!= list_end (&thread_current()->file_list); e = list_next (e)) {
@@ -417,6 +406,13 @@ thread_exit (void)
     list_remove(&f->file_elem);
     close_file(f->file_temp);
     free(f);
+  }
+
+  /* Releases all locks current thread holds. */
+  for (e = list_begin (&thread_current()->lock_holding);
+        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+    l = list_entry (e, struct lock, holding_elem);
+    lock_release(l);
   }
 
   close_file(thread_current ()->executable);
@@ -717,8 +713,13 @@ thread_schedule_tail (struct thread *prev)
   process_activate ();
 #endif
 
-  /* If the thread we switched from is dying, destroy its struct
-     thread.  This must happen late so that thread_exit() doesn't
+  /* If the thread we switched from is dying and it is an orphan,
+     destroy its struct thread.
+     If its parent thread may wait for it, signal parent that it has
+     exited. If the parent is currently waiting for the child, sema_up
+     unblocks the parent thread. If not, the parent will automatically
+     continue when it calls sema_down in wait().
+     This must happen late so that thread_exit() doesn't
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
@@ -726,9 +727,12 @@ thread_schedule_tail (struct thread *prev)
      {
        ASSERT (prev != cur);
 
+
        if (prev->child_elem.prev == NULL && prev->child_elem.next == NULL) {
+         /* Orpahn thread, frees resources. */
          palloc_free_page(prev);
        } else {
+         /* Child thread, notices parent that it exited. */
          sema_up(&prev->wait_mutex);
        }
      }
