@@ -1,3 +1,10 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang, Wei Po Chen
+* Date: 03/21/2018
+* Description: When a user process performs a privileged or
+* prohibited operation, it traps into the kernel as an
+* "exception" or "fault."
+*/
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>

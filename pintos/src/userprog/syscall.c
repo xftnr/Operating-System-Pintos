@@ -1,3 +1,9 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang, Wei Po Chen
+* Date: 03/21/2018
+* Description: Whenever a user process wants to access some
+* kernel functionality, it invokes a system call.
+*/
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
@@ -28,6 +34,10 @@ static void close (int fd);
 
 struct lock file_lock;
 
+/* Check stak pointer
+* If the user provides an invalid pointer, a pointer into kernel memory,
+* or a block partially in one of those regions, terminate the process.
+*/
 static void
 check_esp(void *esp) {
   if (esp == NULL || !is_user_vaddr(esp) ||
@@ -38,6 +48,7 @@ check_esp(void *esp) {
   }
 }
 
+/* Get the struct file_info with the file descriptor */
 static struct file_info *
 get_file(int fd) {
   struct list_elem *e = NULL;

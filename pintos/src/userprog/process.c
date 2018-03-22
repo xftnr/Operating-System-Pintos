@@ -1,3 +1,8 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang, Wei Po Chen
+* Date: 03/21/2018
+* Description: Loads ELF binaries and starts processes.
+*/
 #include "userprog/process.h"
 #include <debug.h>
 #include <inttypes.h>
@@ -19,8 +24,6 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-
-
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
