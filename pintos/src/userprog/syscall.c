@@ -147,12 +147,14 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
-
+/*Terminates Pintos by calling shutdown_power_off()*/
 void
 halt (void){
   shutdown_power_off();
 }
 
+
+/*erminates the current user program, returning status to the kernel*/
 void
 exit (int status) {
   printf("%s: exit(%d)\n", thread_name(), status);
@@ -160,6 +162,8 @@ exit (int status) {
   thread_exit();
 }
 
+/*Runs the executable whose name is given in cmd_line,
+ *passing any given arguments, and returns the new process's program id (pid)*/
 pid_t
 exec (const char *cmd_line){
   lock_acquire(&file_lock);
@@ -171,11 +175,15 @@ exec (const char *cmd_line){
   return tid;
 }
 
+/*Waits for a child process pid and retrieves the child's exit status.*/
 int
 wait (pid_t pid) {
   return process_wait(pid);
 }
 
+/*Writes size bytes from buffer to the open file fd.
+*Returns the number of bytes actually written,
+*which may be less than size if some bytes could not be written.*/
 int
 write (int fd, const void *buffer, unsigned size) {
   lock_acquire(&file_lock);
@@ -202,6 +210,8 @@ write (int fd, const void *buffer, unsigned size) {
   exit(-1);
 }
 
+/*Creates a new file called file initially initial_size bytes in size.
+*Returns true if successful, false otherwise. */
 bool
 create (const char *file, unsigned initial_size) {
   lock_acquire(&file_lock);
@@ -210,6 +220,7 @@ create (const char *file, unsigned initial_size) {
   return result;
 }
 
+/*Deletes the file called file. Returns true if successful, false otherwise.*/
 bool
 remove (const char *file) {
   lock_acquire(&file_lock);
@@ -218,6 +229,9 @@ remove (const char *file) {
   return result;
 }
 
+/*Opens the file called file.
+*Returns a nonnegative integer handle called a "file descriptor" (fd) or -1
+*if the file could not be opened.*/
 int
 open (const char *file){
   lock_acquire(&file_lock);
@@ -237,6 +251,7 @@ open (const char *file){
   return f_i->fd;
 }
 
+/*Returns the size, in bytes, of the file open as fd.*/
 int
 filesize (int fd) {
   lock_acquire(&file_lock);
@@ -253,6 +268,9 @@ filesize (int fd) {
   return result;
 }
 
+/*Reads size bytes from the file open as fd into buffer.
+*Returns the number of bytes actually read (0 at end of file), or -1
+*if the file could not be read (due to a condition other than end of file).*/
 int
 read (int fd, void *buffer, unsigned size) {
   lock_acquire(&file_lock);
@@ -269,6 +287,8 @@ read (int fd, void *buffer, unsigned size) {
   return result;
 }
 
+/*Changes the next byte to be read or written in open file fd to position,
+*expressed in bytes from the beginning of the file.*/
 void
 seek (int fd, unsigned position) {
   lock_acquire(&file_lock);
@@ -284,6 +304,8 @@ seek (int fd, unsigned position) {
   lock_release(&file_lock);
 }
 
+/*Returns the position of the next byte to be read or written in open file fd,
+*expressed in bytes from the beginning of the file.*/
 unsigned
 tell (int fd) {
   lock_acquire(&file_lock);
@@ -300,6 +322,9 @@ tell (int fd) {
   return result;
 }
 
+/*Closes file descriptor fd.
+*Exiting or terminating a process implicitly closes all its open file
+*descriptors, as if by calling this function for each one.*/
 void
 close (int fd) {
   lock_acquire(&file_lock);
@@ -318,6 +343,7 @@ close (int fd) {
   lock_release(&file_lock);
 }
 
+//what is this?????????????
 void
 close_file (struct file *file) {
   lock_acquire(&file_lock);
