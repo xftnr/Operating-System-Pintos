@@ -32,12 +32,13 @@ static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
 
-struct lock file_lock;
+struct lock file_lock;        /* Synchronizea calls to file system. */
 
-/* Check stak pointer
+/* Checks stack pointer
 * If the user provides an invalid pointer, a pointer into kernel memory,
 * or a block partially in one of those regions, terminate the process.
 */
+// Yige driving
 static void
 check_esp(void *esp) {
   if (esp == NULL || !is_user_vaddr(esp) ||
@@ -48,16 +49,19 @@ check_esp(void *esp) {
   }
 }
 
-/* Get the struct file_info with the file descriptor */
+/* Returns the struct file_info containing open file fd
+* by checking fd of all open files of current thread.
+*/
+// Yige driving
 static struct file_info *
 get_file(int fd) {
-  struct list_elem *e = NULL;
-  struct file_info *cur = NULL;
+  struct list_elem *e = NULL;        /* List elements. */
+  struct file_info *f_i = NULL;      /* File Information.*/
   for (e = list_begin (&thread_current()->file_list);
         e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-    cur = list_entry (e, struct file_info, file_elem);
-    if (cur->fd == fd) {
-      return cur;
+    f_i = list_entry (e, struct file_info, file_elem);
+    if (f_i->fd == fd) {
+      return f_i;
     }
   }
   return NULL;
@@ -70,10 +74,11 @@ syscall_init (void)
   lock_init(&file_lock);
 }
 
+// Pengdi driving
 static void
 syscall_handler (struct intr_frame *f)
 {
-  check_esp((void *)(f->esp));
+  check_esp((void *)(f->esp));    /* Checks the pointer to syscall number. */
   uint32_t *esp = (uint32_t *)f->esp;
 
   switch (*esp) {
@@ -82,17 +87,20 @@ syscall_handler (struct intr_frame *f)
       halt();
       break;
     case SYS_EXIT:
+      /* Checks the pointer to argument of syscall. */
       check_esp((void *)(esp + 1));
       exit((int)*(esp + 1));
       break;
     case SYS_EXEC:
       check_esp((void *)(esp + 1));
+      /* Checks the argument(pointer) of syscall. */
       check_esp((void *)*(esp + 1));
+      /* Stores the returned value to eax. */
       f->eax = exec((const char *)*(esp + 1));
       break;
     case SYS_WAIT:
       check_esp((void *)(esp + 1));
-      f->eax = wait ((pid_t)*(esp + 1));
+      f->eax = wait((pid_t)*(esp + 1));
       break;
     // File System
     case SYS_CREATE:
@@ -120,19 +128,21 @@ syscall_handler (struct intr_frame *f)
       check_esp((void *)(esp + 2));
       check_esp((void *)*(esp + 2));
       check_esp((void *)(esp + 3));
-      f->eax = read ((int)*(esp + 1), (void *)*(esp + 2), (unsigned)*(esp + 3));
+      f->eax = read((int)*(esp + 1), (void *)*(esp + 2),
+                    (unsigned)*(esp + 3));
       break;
     case SYS_WRITE:
       check_esp((void *)(esp + 1));
       check_esp((void *)(esp + 2));
       check_esp((void *)*(esp + 2));
       check_esp((void *)(esp + 3));
-      f->eax = write ((int)*(esp + 1), (const void *)*(esp + 2), (unsigned)*(esp + 3));
+      f->eax = write((int)*(esp + 1), (const void *)*(esp + 2),
+                     (unsigned)*(esp + 3));
       break;
     case SYS_SEEK:
       check_esp((void *)(esp + 1));
       check_esp((void *)(esp + 2));
-      seek ((int)*(esp + 1), (unsigned)*(esp + 2));
+      seek((int)*(esp + 1), (unsigned)*(esp + 2));
       break;
     case SYS_TELL:
       check_esp((void *)(esp + 1));
@@ -147,14 +157,17 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
-/*Terminates Pintos by calling shutdown_power_off()*/
+/* Terminates Pintos by calling shutdown_power_off().
+ */
+// Peijie driving
 void
 halt (void){
   shutdown_power_off();
 }
 
-
-/*erminates the current user program, returning status to the kernel*/
+/* Updates exit_status so its parent can know its exit status,
+*  print process's exit code then terminates the process.
+*/
 void
 exit (int status) {
   printf("%s: exit(%d)\n", thread_name(), status);
@@ -162,56 +175,64 @@ exit (int status) {
   thread_exit();
 }
 
-/*Runs the executable whose name is given in cmd_line,
- *passing any given arguments, and returns the new process's program id (pid)*/
+/* Runs the executable whose name is given in cmd_line,
+* passing any given arguments, and returns the new process's program id.
+*/
+// Pengdi driving
 pid_t
 exec (const char *cmd_line){
+  /* Synchronizes file system calls in process_execute. */
   lock_acquire(&file_lock);
-
   tid_t tid;
   tid = process_execute(cmd_line);
   lock_release(&file_lock);
-
   return tid;
 }
 
-/*Waits for a child process pid and retrieves the child's exit status.*/
+/* Waits for a child process pid and retrieves the child's exit status.
+*/
+// Peijie driving
 int
 wait (pid_t pid) {
   return process_wait(pid);
 }
 
-/*Writes size bytes from buffer to the open file fd.
-*Returns the number of bytes actually written,
-*which may be less than size if some bytes could not be written.*/
+/* Writes size bytes from buffer to the open file fd.
+* For fd 1, writes to standard output.
+* Returns the number of bytes actually written,
+* which may be less than size if some bytes could not be written.
+*/
+// Wei Po driving
 int
 write (int fd, const void *buffer, unsigned size) {
   lock_acquire(&file_lock);
   if (fd == 1) {
+    /* Writes to standard output. */
     putbuf (buffer, size);
     lock_release(&file_lock);
-
     return size;
-  } else if (fd != 0) {
-
+  } else if (fd != 0){
+    /* Writes to open file fd. */
     struct file_info *cur_info = get_file(fd);
     if (cur_info == NULL) {
+      /* No such open file fd for current process. */
       lock_release(&file_lock);
       exit(-1);
     }
 
     struct file *cur = cur_info->file_temp;
-
     int result = file_write (cur, buffer, size);
     lock_release(&file_lock);
-
     return result;
+  } else {  /* Never writes to standard input. */
+    exit(-1);
   }
-  exit(-1);
 }
 
-/*Creates a new file called file initially initial_size bytes in size.
-*Returns true if successful, false otherwise. */
+/* Creates a new file called file initially initial_size bytes in size.
+* Returns true if successful, false otherwise.
+*/
+// Yige driving
 bool
 create (const char *file, unsigned initial_size) {
   lock_acquire(&file_lock);
@@ -220,7 +241,9 @@ create (const char *file, unsigned initial_size) {
   return result;
 }
 
-/*Deletes the file called file. Returns true if successful, false otherwise.*/
+/* Deletes the file called file.
+* Returns true if successful, false otherwise.
+*/
 bool
 remove (const char *file) {
   lock_acquire(&file_lock);
@@ -229,126 +252,139 @@ remove (const char *file) {
   return result;
 }
 
-/*Opens the file called file.
-*Returns a nonnegative integer handle called a "file descriptor" (fd) or -1
-*if the file could not be opened.*/
+/* Opens the file called file.
+* Returns a nonnegative integer handle called a "file descriptor" (fd)
+* or -1 if the file could not be opened.
+*/
 int
 open (const char *file){
   lock_acquire(&file_lock);
-  struct file *f = filesys_open(file);
-
-  if (f == NULL) {
+  struct file *cur = filesys_open(file);
+  if (cur == NULL) {
+    /* No file named NAME exists, or an internal memory allocation fails. */
     lock_release(&file_lock);
     return -1;
   }
-  struct file_info *f_i = (struct file_info*)malloc(sizeof(struct file_info));
-  f_i->file_temp = f;
-  f_i->fd = thread_current()->fd;
-  thread_current()->fd++;
-
-  list_push_back (&thread_current()->file_list, &f_i->file_elem);
+  struct file_info *cur_info = malloc(sizeof(struct file_info));
+  cur_info->file_temp = cur;
+  cur_info->fd = thread_current()->fd;
+  thread_current()->fd++;      /* Updates next fd for open file. */
+  /* Adds file to current thread's list of open files. */
+  list_push_back (&thread_current()->file_list, &cur_info->file_elem);
   lock_release(&file_lock);
-  return f_i->fd;
+  return cur_info->fd;
 }
 
-/*Returns the size, in bytes, of the file open as fd.*/
+/* Returns the size, in bytes, of the file open as fd.
+*/
+// Wei Po driving
 int
 filesize (int fd) {
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    /* No such open file fd for current process. */
     lock_release(&file_lock);
     exit(-1);
   }
-  struct file *cur = cur_info->file_temp;
 
+  struct file *cur = cur_info->file_temp;
   int result = file_length(cur);
   lock_release(&file_lock);
   return result;
 }
 
-/*Reads size bytes from the file open as fd into buffer.
-*Returns the number of bytes actually read (0 at end of file), or -1
-*if the file could not be read (due to a condition other than end of file).*/
+/* Reads size bytes from the file open as fd into buffer.
+* Returns the number of bytes actually read (0 at end of file), or -1
+* if the file could not be read (due to a condition other than end of file).
+*/
 int
 read (int fd, void *buffer, unsigned size) {
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    /* No such open file fd for current process. */
     lock_release(&file_lock);
     exit(-1);
   }
-  struct file *cur = cur_info->file_temp;
 
+  struct file *cur = cur_info->file_temp;
   int result = file_read (cur, buffer, size);
   lock_release(&file_lock);
   return result;
 }
 
-/*Changes the next byte to be read or written in open file fd to position,
-*expressed in bytes from the beginning of the file.*/
+/* Changes the next byte to be read or written in open file fd to position,
+* expressed in bytes from the beginning of the file.
+*/
 void
 seek (int fd, unsigned position) {
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    /* No such open file fd for current process. */
     lock_release(&file_lock);
     exit(-1);
   }
-  struct file *cur = cur_info->file_temp;
 
+  struct file *cur = cur_info->file_temp;
   file_seek (cur, position);
   lock_release(&file_lock);
 }
 
-/*Returns the position of the next byte to be read or written in open file fd,
-*expressed in bytes from the beginning of the file.*/
+/* Returns the position of the next byte to be read or written
+* in open file fd, expressed in bytes from the beginning of the file.
+*/
 unsigned
 tell (int fd) {
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    /* No such open file fd for current process. */
     lock_release(&file_lock);
     exit(-1);
   }
-  struct file *cur = cur_info->file_temp;
 
+  struct file *cur = cur_info->file_temp;
   unsigned result = file_tell (cur);
   lock_release(&file_lock);
   return result;
 }
 
-/*Closes file descriptor fd.
-*Exiting or terminating a process implicitly closes all its open file
-*descriptors, as if by calling this function for each one.*/
+/* Closes file descriptor fd. Remove file from file_list and frees resources.
+*/
+// Yige driving
 void
 close (int fd) {
   lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
+    /* No such open file fd for current process. */
     lock_release(&file_lock);
     exit(-1);
   }
+
   struct file *cur = cur_info->file_temp;
+
+  /* No longer a open file of current process. */
   list_remove(&cur_info->file_elem);
 
   file_close (cur);
-  free(cur_info);
-
+  free(cur_info);     /* Frees memory allocated. */
   lock_release(&file_lock);
 }
 
-//what is this?????????????
+/* Closes open file file.
+* Used when exiting or terminating a process implicitly.
+*/
 void
 close_file (struct file *file) {
   lock_acquire(&file_lock);
-
   file_close (file);
-
   lock_release(&file_lock);
 }

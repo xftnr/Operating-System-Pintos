@@ -237,6 +237,8 @@ thread_create (const char *name, int priority,
   /* Add to ready queue. */
   thread_unblock (t);
 
+  // Yige, Pengdi driving
+
   if (thread_current()->calling_exec) {
     /* Thread t is a child thread of current thread. */
     list_push_back (&thread_current()->child_list, &t->child_elem);
@@ -368,7 +370,7 @@ thread_exit (void)
   struct list_elem *e = NULL;       /* List elements. */
   struct thread *child = NULL;      /* Child threads. */
   struct lock *l = NULL;            /* Locks holds. */
-  struct file_info *f = NULL;       /* Open files. */
+  struct file_info *f_i = NULL;       /* Open files. */
 
   ASSERT (!intr_context ());
 
@@ -380,6 +382,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+
+  // Yige, Pengdi, Peijie, Wei Po driving
 
   /* Destroys current thread's relationship with all its child threads. */
   for (e = list_begin (&thread_current()->child_list);
@@ -401,11 +405,11 @@ thread_exit (void)
   /* Closes open files of current thread and frees resources. */
   for (e = list_begin (&thread_current()->file_list);
         e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-    f = list_entry (e, struct file_info, file_elem);
+    f_i = list_entry (e, struct file_info, file_elem);
     e = e->prev;
-    list_remove(&f->file_elem);
-    close_file(f->file_temp);
-    free(f);
+    list_remove(&f_i->file_elem);
+    close_file(f_i->file_temp);
+    free(f_i);
   }
 
   /* Releases all locks current thread holds. */

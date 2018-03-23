@@ -45,6 +45,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // Peijie, Wei Po driving
   /* Retrieve executable file name from command line. */
   char s[128];                /* Temperary string to hold the command line */
   char *token = NULL;         /* Tokenized argument */
@@ -88,6 +89,7 @@ start_process (void *file_name_)
 
   success = load (file_name, &if_.eip, &if_.esp);
 
+  // Yige, Pengdi driving
   /* If load failed, remove from parent's child list, quit. */
   if (!success) {
     thread_current()->tid = TID_ERROR;
@@ -125,6 +127,7 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+// Peijie, Wei Po driving
 int
 process_wait (tid_t child_tid)
 {
