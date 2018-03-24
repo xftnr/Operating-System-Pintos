@@ -266,6 +266,11 @@ open (const char *file){
     return -1;
   }
   struct file_info *cur_info = malloc(sizeof(struct file_info));
+  if (cur_info == NULL) {
+    /* Malloc failed. */
+    lock_release(&file_lock);
+    return -1;
+  }
   cur_info->file_temp = cur;
   cur_info->fd = thread_current()->fd;
   thread_current()->fd++;      /* Updates next fd for open file. */

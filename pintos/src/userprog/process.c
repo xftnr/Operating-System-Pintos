@@ -407,15 +407,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
-
  done:
-  /* We arrive here whether the load is successful or not. */
-  if (success) {
-    thread_current()->executable = file;
-    file_deny_write(file);
-  } else {
-    file_close (file);
-  }
+ /* We arrive here whether the load is successful or not. */
+thread_current()->executable = file;
+if (success) {
+   file_deny_write(file);
+ } 
   return success;
 }
 
@@ -541,7 +538,6 @@ setup_stack (void **esp, int argc, char **argv)
   int i;                    /* Index */
   char *argv_addr[argc];    /* The address of each argument on stack */
   char *char_esp = NULL;    /* Stack pointer to a character */
-  int align;                /* Keep track of word alignment */
   uint8_t word_align;       /* Number used to align */
   uint8_t *align_esp = NULL;      /* Stack pointer to an unsigned integer */
   char **char_ptr_esp = NULL;     /* Stack pointer to a character pointer */
@@ -560,10 +556,8 @@ setup_stack (void **esp, int argc, char **argv)
       /* Argument Passing */
       /* Push argv onto the stack in reverse order */
       char_esp = (char *) *esp;
-      align = 0;
       for (i = argc - 1; i >= 0; i--) {
         char_esp -= (strlen(argv[i]) + 1);    // Decrement pointer for argument
-        align += (strlen(argv[i]) + 1);       // Increment bytes used
         strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);    // copy argument
         argv_addr[i] = char_esp;         // Save argument's address on stack
       }
@@ -574,23 +568,12 @@ setup_stack (void **esp, int argc, char **argv)
       align_esp = (uint8_t *) *esp;
       word_align = 0;
 
-      // Calculate number of bytes needed to align
-      align %= 4;
-      if (align > 0) {
-        align = 4 - align;
-      }
-
-      for (i = 0; i < align; i++) {
+      while ((uint32_t)align_esp & 0x3) {       // Address is not a multiple of 4
         align_esp--;
         *align_esp = word_align;      // Write the number to stack
       }
 
-      // while (align_esp & 0x3) {
-      //   align_esp--;
-      //   *align_esp = word_align;      // Write the number to stack
-      // }
-
-      *esp = align_esp;               // Update stack pointer
+      *esp = (uint8_t *) align_esp;               // Update stack pointer
 
       /* Push arguments' addresses on stack onto the stack in reverse order */
       char_ptr_esp = (char **) *esp;
@@ -619,16 +602,15 @@ setup_stack (void **esp, int argc, char **argv)
       int_esp = (int *) *esp;
       int_esp--;
       *int_esp = argc;        // Write argc
+
       *esp = int_esp;         // Update stack pointer
 
       /* Push fake return address onto the stack */
       fake_ptr_esp = (void **) *esp;
       fake_ptr_esp--;
       *fake_ptr_esp = (void *) 0;     /* Write fake return address 0 */
-      *esp = fake_ptr_esp;
 
-      // hex_dump ((uintptr_t)*esp, *esp, PHYS_BASE - *esp, 1);
-
+      *esp = fake_ptr_esp;    // Update stack pointer
     }  else {
       palloc_free_page (kpage);
     }

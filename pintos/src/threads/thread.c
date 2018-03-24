@@ -217,7 +217,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
 
-  tid = t->tid = allocate_tid ();
+  t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -378,48 +378,50 @@ thread_exit (void)
   process_exit ();
 #endif
 
+// Yige, Pengdi, Peijie, Wei Po driving
+
+/* Destroys current thread's relationship with all its child threads. */
+for (e = list_begin (&thread_current()->child_list);
+      e!= list_end (&thread_current()->child_list); e = list_next (e)) {
+  child = list_entry (e, struct thread, child_elem);
+  e = e->prev;
+  list_remove(&child->child_elem);
+
+  if (child->status == THREAD_DYING) {
+    /* Child exited. Free child resources. */
+    palloc_free_page (child);
+  } else {
+    /* Child is alive, remove relationship. Child becomes orphan. */
+    child->child_elem.prev = NULL;
+    child->child_elem.next = NULL;
+  }
+}
+
+/* Closes open files of current thread and frees resources. */
+for (e = list_begin (&thread_current()->file_list);
+      e!= list_end (&thread_current()->file_list); e = list_next (e)) {
+  f_i = list_entry (e, struct file_info, file_elem);
+  e = e->prev;
+  list_remove(&f_i->file_elem);
+  close_file(f_i->file_temp);
+  free(f_i);
+}
+
+/* Releases all locks current thread holds. */
+for (e = list_begin (&thread_current()->lock_holding);
+      e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+  l = list_entry (e, struct lock, holding_elem);
+  lock_release(l);
+}
+
+/* Close executable file of terminating thread,
+  allows write to file automatically. */
+close_file(thread_current ()->executable);
+
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-
-  // Yige, Pengdi, Peijie, Wei Po driving
-
-  /* Destroys current thread's relationship with all its child threads. */
-  for (e = list_begin (&thread_current()->child_list);
-        e!= list_end (&thread_current()->child_list); e = list_next (e)) {
-    child = list_entry (e, struct thread, child_elem);
-    e = e->prev;
-    list_remove(&child->child_elem);
-
-    if (child->status == THREAD_DYING) {
-      /* Child exited. Free child resources. */
-      palloc_free_page (child);
-    } else {
-      /* Child is alive, remove relationship. Child becomes orphan. */
-      child->child_elem.prev = NULL;
-      child->child_elem.next = NULL;
-    }
-  }
-
-  /* Closes open files of current thread and frees resources. */
-  for (e = list_begin (&thread_current()->file_list);
-        e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-    f_i = list_entry (e, struct file_info, file_elem);
-    e = e->prev;
-    list_remove(&f_i->file_elem);
-    close_file(f_i->file_temp);
-    free(f_i);
-  }
-
-  /* Releases all locks current thread holds. */
-  for (e = list_begin (&thread_current()->lock_holding);
-        e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
-    l = list_entry (e, struct lock, holding_elem);
-    lock_release(l);
-  }
-
-  close_file(thread_current ()->executable);
 
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
@@ -730,7 +732,6 @@ thread_schedule_tail (struct thread *prev)
      if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
      {
        ASSERT (prev != cur);
-
 
        if (prev->child_elem.prev == NULL && prev->child_elem.next == NULL) {
          /* Orpahn thread, frees resources. */
