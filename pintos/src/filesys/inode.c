@@ -12,6 +12,9 @@
 #define DIRECT_NUM 10
 #define BLOCKS_IN_INDIRECT (BLOCK_SECTOR_SIZE/sizeof(block_sector_t))
 
+// #define INDIRECT_NUM 138
+// #define DOUBLE_INDIRECT_NUM 16522
+
 /* On-disk inode.
 Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -64,6 +67,13 @@ struct inode
         block_sector_t buffer[BLOCKS_IN_INDIRECT];
         block_read (fs_device, inode->data.indirect_block, buffer);
         return buffer[sectors - DIRECT_NUM];
+      }else{
+        block_sector_t buffer[BLOCKS_IN_INDIRECT];
+        block_sector_t buffer2[BLOCKS_IN_INDIRECT];
+        size_t indirect_index = (sectors - 138) / 128;
+        block_read (fs_device, inode->data.double_indirect_block, buffer);
+        block_read (fs_device, buffer[indirect_index], buffer2);
+        return buffer2[(sectors - 138) % 128];
       }
 
 
@@ -102,17 +112,17 @@ struct inode
   //     return buffer[num_sector - DIRECT_NUM];
   //   }
   //
-  //   // if (num_sector > 138){
-  //   //   size_t indirect_index = (num_sector - 138) / 128;
-  //   //   if ((num_sector - INDIRECT_NUM) % 128 != 0)
-  //   //     indirect_index ++;
-  //   //
-  //   //   block_sector_t double_buffer[128];
-  //   //   block_read (fs_device, inode->data.double_indirect_block, double_buffer);
-  //   //   block_sector_t buffer[128];
-  //   //   block_read (fs_device, double_buffer[indirect_index], buffer);
-  //   //   return buffer [(num_sector - INDIRECT_NUM) % 128];
-  //   // }
+  //   if (num_sector > 138){
+  //     size_t indirect_index = (num_sector - 138) / 128;
+  //     if ((num_sector - INDIRECT_NUM) % 128 != 0)
+  //       indirect_index ++;
+  // inode->data.double_indirect_block
+  //     block_sector_t double_buffer[128];
+  //     block_read (fs_device, inode->data.double_indirect_block, double_buffer);
+  //     block_sector_t buffer[128];
+  //     block_read (fs_device, double_buffer[indirect_index], buffer);
+  //     return buffer [(num_sector - INDIRECT_NUM) % 128];
+  //   }
   //   return NULL;
   // }
 
@@ -158,6 +168,35 @@ indirect_block_allocate(size_t current_sectors, size_t sectors_to_add, block_sec
   block_write (fs_device, indirect_block, buffer);
   return indirect_block;
 }
+
+
+block_sector_t
+double_indirect_block_allocate(size_t current_sectors, size_t sectors_to_add, block_sector_t double_indirect_block) {
+//   block_sector_t double_indirect_block = 0;
+  block_sector_t buffer[BLOCKS_IN_INDIRECT];
+
+  if (double_indirect_block == 0) {
+    if (!free_map_allocate (1, &double_indirect_block)) {
+      return NULL;
+    }
+  } else {
+    block_read (fs_device, double_indirect_block, buffer);
+  }
+  int number_of_indirect = sectors_to_add / 128;
+  int temp = number_of_indirect;
+  while (sectors_to_add > 0 && number_of_indirect > 0) {
+    if(!indirect_block_allocate(current_sectors, sectors_to_add, &buffer[temp - number_of_indirect])){
+      break;
+    }
+
+    number_of_indirect --;
+    sectors_to_add-=BLOCKS_IN_INDIRECT;
+    current_sectors+=BLOCKS_IN_INDIRECT;
+  }
+  block_write (fs_device, double_indirect_block, buffer);
+  return double_indirect_block;
+}
+
 
 // block_sector_t
 // double_indirect_block_allocate(size_t current_sectors, size_t sectors_to_add, struct inode_disk *disk_inode) {
@@ -249,16 +288,26 @@ sector_allocate(size_t sectors_to_add, struct inode_disk *disk_inode) {
       return true;
     }
 
-    printf("allocat double indirect \n\n");
+
+//change here
+    if (sectors_to_add > 16384){
+      return false;
+    }
+
+    if ((disk_inode->double_indirect_block =
+      double_indirect_block_allocate(current_sectors - 138, sectors_to_add, disk_inode->double_indirect_block))
+      == NULL) {
+        return false;
+      }
 
     // double_indirect_block_allocate(current_sectors - DIRECT_NUM - BLOCKS_IN_INDIRECT,
     //   sectors_to_add, disk_inode);
-    //
-    //
-    //   // calculate how many sectors to allocate in double_indirect_block
-    //   if ((disk_inode->double_indirect_block = double_indirect_block_allocate(sectors_to_add)) == NULL) {
-    //     return false;
-    //   }
+
+
+      // // calculate how many sectors to allocate in double_indirect_block
+      // if ((disk_inode->double_indirect_block = double_indirect_block_allocate(sectors_to_add)) == NULL) {
+      //   return false;
+      // }
 
   // size_t blocks = 0;
   // // file > 8MB?????
