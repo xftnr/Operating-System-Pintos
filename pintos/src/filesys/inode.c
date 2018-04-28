@@ -55,7 +55,7 @@ struct inode
   byte_to_sector (const struct inode *inode, off_t pos)
   {
     ASSERT (inode != NULL);
-    if (pos < inode->data.length) {
+    if (pos <= inode->data.length) {
       if (pos < BLOCK_SECTOR_SIZE * DIRECT_NUM) {
         return inode->data.direct_blocks[pos / BLOCK_SECTOR_SIZE];
       } else if (pos < BLOCK_SECTOR_SIZE * (DIRECT_NUM + BLOCKS_IN_INDIRECT)) {
@@ -150,35 +150,25 @@ indirect_block_allocate(size_t current_sectors, size_t sectors_to_add, struct in
 
 bool
 sector_allocate(size_t sectors_to_add, struct inode_disk *disk_inode) {
-  printf("here to add %d\n\n\n", sectors_to_add);
-
   size_t current_sectors = bytes_to_sectors (disk_inode->length);
 
-  printf("here current %d\n\n\n\n", current_sectors);
-
-
   if (sectors_to_add == 0) {
-    printf("here add 0\n\n\n\n");
-
     return true;
   }
-
+printf("sectors to add %d\n\n", sectors_to_add);
   while (sectors_to_add > 0 && current_sectors < DIRECT_NUM) {
     if (!free_map_allocate (1, &disk_inode->direct_blocks[current_sectors])) {
-      printf("here allocate failed\n\n\n\n");
-
       return false;
     }
-    printf("here2\n\n\n\n");
+
+    printf("%d \n\n", disk_inode->direct_blocks[current_sectors]);
+
 
     static char zeros[BLOCK_SECTOR_SIZE];
     block_write (fs_device, disk_inode->direct_blocks[current_sectors], zeros);
     sectors_to_add--;
     current_sectors++;
   }
-
-  printf("here5 current %d\n\n\n\n", current_sectors);
-
 
   if (sectors_to_add == 0) {
     return true;
@@ -264,17 +254,18 @@ inode_create (block_sector_t sector, off_t length)
     size_t sectors = bytes_to_sectors (length);
     disk_inode->length = 0;
     disk_inode->magic = INODE_MAGIC;
-    for (i = 0; i < DIRECT_NUM; i++) {
-      disk_inode->direct_blocks[i] = 0;
-    }
+    // disk_inode->direct_blocks = {0};
     disk_inode->indirect_block = 0;
     disk_inode->double_indirect_block = 0;
 
     if (sector_allocate(sectors, disk_inode)) {
+      disk_inode->length = length;
+
+printf("%d \n\n ", disk_inode->direct_blocks[0]);
+
       block_write (fs_device, sector, disk_inode);
       success = true;
     }
-    disk_inode->length = length;
 
     // Original Code
     // if (free_map_allocate (sectors, &disk_inode->start)) {
@@ -464,15 +455,17 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
     off_t new_length = offset + size;
 
-printf("writing curr length %d, new length %d\n\n", inode->data.length, new_length);
     if (new_length > inode->data.length) {
       // file extension
       off_t extension_length = new_length - inode->data.length;
       size_t sectors = bytes_to_sectors (extension_length);
       sector_allocate(sectors, &inode->data);
+
     }
     while (size > 0)
     {
+
+
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
@@ -521,6 +514,7 @@ printf("writing curr length %d, new length %d\n\n", inode->data.length, new_leng
       offset += chunk_size;
       bytes_written += chunk_size;
     }
+inode->data.length = new_length;
   free (bounce);
 
   return bytes_written;
