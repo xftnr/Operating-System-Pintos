@@ -31,6 +31,12 @@ static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
+static bool chdir (const char *dir);
+static bool mkdir (const char *dir);
+static bool readdir (int fd, char *name);
+static bool isdir (int fd);
+static int inumber (int fd);
+
 
 struct lock file_lock;        /* Synchronizea calls to file system. */
 
@@ -152,6 +158,31 @@ syscall_handler (struct intr_frame *f)
       check_esp((void *)(esp + 1));
       close((int)*(esp + 1));
       break;
+    // Directory
+    // case SYS_CHDIR:
+    //   check_esp((void *)(esp + 1));
+    //   check_esp((void *)*(esp + 1));
+    //   f->eax = chdir((const char *)*(esp + 1));
+    //   break;
+    // case SYS_MKDIR:
+    //   check_esp((void *)(esp + 1));
+    //   check_esp((void *)*(esp + 1));
+    //   f->eax = mkdir((const char *)*(esp + 1));
+    //   break;
+    // case SYS_READDIR:
+    //   check_esp((void *)(esp + 1));
+    //   check_esp((void *)(esp + 2));
+    //   check_esp((void *)*(esp + 2));
+    //   f->eax = readdir((int)*(esp + 1), (const void *)*(esp + 2));
+    //   break;
+    // case SYS_ISDIR:
+    //   check_esp((void *)(esp + 1));
+    //   f->eax = isdir((int)*(esp + 1));
+    //   break;
+    // case SYS_INUMBER:
+    //   check_esp((void *)(esp + 1));
+    //   f->eax = inumber((int)*(esp + 1));
+    //   break;
     default:
       printf("System Call not implemented.\n");
   }
@@ -393,3 +424,19 @@ close_file (struct file *file) {
   file_close (file);
   lock_release(&file_lock);
 }
+
+
+// bool
+// chdir (const char *dir);
+//
+// bool
+// mkdir (const char *dir);
+//
+// bool
+// readdir (int fd, char *name);
+//
+// bool
+// isdir (int fd);
+//
+// int
+// inumber (int fd);
