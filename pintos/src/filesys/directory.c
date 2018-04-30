@@ -37,13 +37,13 @@ struct dir *
 dir_open (struct inode *inode)
 {
 
-printf("dir open %d\n", inode_get_inumber(inode));
+// printf("dir open %d\n", inode_get_inumber(inode));
 
   struct dir *dir = calloc (1, sizeof *dir);
   if (inode != NULL && dir != NULL)
     {
 
-      printf("here\n");
+      // printf("here\n");
 
       dir->inode = inode;
       dir->pos = 0;
@@ -62,7 +62,7 @@ printf("dir open %d\n", inode_get_inumber(inode));
 struct dir *
 dir_open_root (void)
 {
-  printf("dir_open_root\n");
+  // printf("dir_open_root\n");
 
   return dir_open (inode_open (ROOT_DIR_SECTOR));
 }
@@ -262,11 +262,9 @@ dir_remove (struct dir *dir, const char *name)
     for (ofs1 = 2*(sizeof e1); inode_read_at (inode, &e1, sizeof e1, ofs1) == sizeof e1;
     ofs1 += sizeof e1) {
       if (e1.in_use) {
-        dir_close(inode);
         goto done;
       }
     }
-    dir_close(inode);
   }
 
   /* Erase directory entry. */

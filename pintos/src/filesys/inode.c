@@ -258,7 +258,7 @@ inode_open (block_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
-printf("sector %d\n\n", sector);
+// printf("sector %d\n\n", sector);
 
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
@@ -266,17 +266,16 @@ printf("sector %d\n\n", sector);
     {
 
       inode = list_entry (e, struct inode, elem);
-      printf("in for %d\n\n", inode->sector);
+      // printf("in for %d\n\n", inode->sector);
 
       if (inode->sector == sector)
         {
-          printf("return inode %d\n\n", sector);
+          // printf("return inode %d\n\n", sector);
 
           inode_reopen (inode);
           return inode;
         }
     }
-
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
@@ -286,13 +285,14 @@ printf("sector %d\n\n", sector);
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
   inode->sector = sector;
+  // printf("assigning inode %d\n\n", sector);
+
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
   block_read (fs_device, inode->sector, &inode->data);
 
-  printf("here\n\n");
-
+  // printf("here\n\n");
 
   return inode;
 }

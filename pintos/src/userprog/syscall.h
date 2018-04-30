@@ -11,6 +11,7 @@ struct file_info
 {
     int fd;                            /* File descriptor. */
     struct file *file_temp;            /* Associated file. */
+    struct file *dir_temp;            /* Associated directory. */
     struct list_elem file_elem;        /* List element for file list. */
 };
 

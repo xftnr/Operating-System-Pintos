@@ -16,6 +16,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/directory.h"
 #include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
@@ -167,12 +168,12 @@ syscall_handler (struct intr_frame *f)
       check_esp((void *)*(esp + 1));
       f->eax = mkdir((const char *)*(esp + 1));
       break;
-    // case SYS_READDIR:
-    //   check_esp((void *)(esp + 1));
-    //   check_esp((void *)(esp + 2));
-    //   check_esp((void *)*(esp + 2));
-    //   f->eax = readdir((int)*(esp + 1), (const void *)*(esp + 2));
-    //   break;
+    case SYS_READDIR:
+      check_esp((void *)(esp + 1));
+      check_esp((void *)(esp + 2));
+      check_esp((void *)*(esp + 2));
+      f->eax = readdir((int)*(esp + 1), (const void *)*(esp + 2));
+      break;
     case SYS_ISDIR:
       check_esp((void *)(esp + 1));
       f->eax = isdir((int)*(esp + 1));
@@ -305,6 +306,14 @@ open (const char *file){
     return -1;
   }
   cur_info->file_temp = cur;
+
+  struct inode *inode = file_get_inode(cur);
+  if (inode != NULL && inode_isdir(inode)) {
+    cur_info->dir_temp = dir_open(inode_reopen(inode));
+  } else {
+    cur_info->dir_temp = NULL;
+  }
+
   cur_info->fd = thread_current()->fd;
   thread_current()->fd++;      /* Updates next fd for open file. */
   /* Adds file to current thread's list of open files. */
@@ -407,12 +416,15 @@ close (int fd) {
     exit(-1);
   }
 
-  struct file *cur = cur_info->file_temp;
-
   /* No longer a open file of current process. */
   list_remove(&cur_info->file_elem);
 
-  file_close (cur);
+  file_close (cur_info->file_temp);
+
+  if (cur_info->dir_temp != NULL) {
+    dir_close(cur_info->dir_temp);
+  }
+
   free(cur_info);     /* Frees memory allocated. */
   lock_release(&file_lock);
 }
@@ -443,10 +455,41 @@ mkdir (const char *dir) {
   return result;
 }
 
-// bool
-// readdir (int fd, char *name) {
-//
-// }
+bool
+readdir (int fd, char *name) {
+  lock_acquire(&file_lock);
+
+  struct file_info *cur_info = get_file(fd);
+  if (cur_info == NULL) {
+    /* No such open file fd for current process. */
+    lock_release(&file_lock);
+    return false;
+  }
+
+  struct file *cur = cur_info->file_temp;
+  struct inode *inode = file_get_inode(cur);
+
+  if(inode == NULL) {
+    lock_release(&file_lock);
+    return false;
+  }
+
+  if (!inode_isdir(inode)) {
+    lock_release(&file_lock);
+    return false;
+  }
+
+  bool result = dir_readdir(cur_info->dir_temp, name);
+  if (strcmp(name, ".") == 0) {
+    result = dir_readdir(cur_info->dir_temp, name);
+    result = dir_readdir(cur_info->dir_temp, name);
+  } else if (strcmp(name, "..") == 0) {
+    result = dir_readdir(cur_info->dir_temp, name);
+  }
+
+  lock_release(&file_lock);
+  return result;
+}
 
 bool
 isdir (int fd) {
