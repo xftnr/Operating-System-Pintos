@@ -47,14 +47,16 @@ process_execute (const char *file_name)
 
   // Peijie, Wei Po driving
   /* Retrieve executable file name from command line. */
-  char s[128];                /* Temperary string to hold the command line */
+  char *s = NULL;             /* Temperary string to hold the command line */
   char *token = NULL;         /* Tokenized argument */
   char *save_ptr = NULL;      /* Saved position in String */
-  int index;                  /* Index in the array*/
 
   // Save arguments to the argument vector
-  index = 0;
-  strlcpy(s, file_name, strlen(file_name) + 1);
+  s = palloc_get_page (0);
+  if (s == NULL)
+    return TID_ERROR;
+  strlcpy (s, file_name, PGSIZE);
+
   token = strtok_r (s, " ", &save_ptr);
 
   /* Sets current thread's calling_exec to true so the created thread
@@ -67,7 +69,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
-
+  palloc_free_page (s);
   thread_current()->calling_exec = false;
   return tid;
 }
@@ -88,6 +90,10 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   success = load (file_name, &if_.eip, &if_.esp);
+
+if (thread_current()->current_directory == NULL) {
+  thread_current()->current_directory = dir_open_root();
+}
 
   // Yige, Pengdi driving
   /* If load failed, remove from parent's child list, quit. */
@@ -161,6 +167,9 @@ process_wait (tid_t child_tid)
   sema_down(&child->wait_mutex);
 
   int result = child->exit_status;
+  list_remove(&child->child_elem);
+  sema_up(&child->exit_mutex);
+
   return result;
 }
 
@@ -287,140 +296,175 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-  int argc;                   /* Argument count */
-  char s[128];                /* Temperary string to hold the command line */
-  char *token = NULL;         /* Tokenized argument */
-  char *save_ptr = NULL;      /* Saved position in String */
-  char *argv[128];     /* Argument vector */
-  int index;                  /* Index in the array*/
+  int argc;                 /* Argument count */
+  char *s = NULL;           /* Temperary string to hold the command line */
+  char *token = NULL;           /* Tokenized argument */
+  char *save_ptr = NULL;        /* Saved position in String */
+  char **argv = NULL;           /* Argument vector */
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL)
-  goto done;
+  if (t->pagedir == NULL) {
+    goto done;
+  }
   process_activate ();
 
   // Yige, Pengdi, Peijie, Wei Po driving
   /* Parse command line arguments */
+  // Save arguments to the argument vector
+  s = palloc_get_page (0);
+  if (s == NULL)
+  goto done;
+  strlcpy (s, file_name, PGSIZE);
+
   // Count number of arguments
   argc = 0;
-  strlcpy(s, file_name, strlen(file_name) + 1);
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
   token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }
 
-  // Save arguments to the argument vector
-  index = 0;
-  strlcpy(s, file_name, strlen(file_name) + 1);
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
-  token = strtok_r (NULL, " ", &save_ptr)) {
-    argv[index] = token;
-    index++;
+  strlcpy (s, file_name, PGSIZE);
+  // Allocates space for argv[]
+  argv = malloc (argc * sizeof(char *));
+  if (argv == NULL) {
+    palloc_free_page (s);
+    goto done;
   }
 
+  // Saves the arguments to argv[]
+  argc = 0;
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+  token = strtok_r (NULL, " ", &save_ptr)) {
+    argv[argc] = malloc((strlen(token)+1) * sizeof(char));
+    strlcpy (argv[argc], token, strlen(token)+1);
+    argc++;
+  }
+
+  palloc_free_page (s);
+
+  lock_acquire(&file_lock);
   file = filesys_open(argv[0]);
+  lock_release(&file_lock);
   if (file == NULL)
-    {
-      printf ("load: %s: open failed\n", file_name);
-      goto done;
-    }
+  {
+    printf ("load: %s: open failed\n", file_name);
+    goto done;
+  }
 
   /* Read and verify executable header. */
+  lock_acquire(&file_lock);
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
-      || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
-      || ehdr.e_type != 2
-      || ehdr.e_machine != 3
-      || ehdr.e_version != 1
-      || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
-      || ehdr.e_phnum > 1024)
-    {
-      printf ("load: %s: error loading executable\n", file_name);
-      goto done;
-    }
+  || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
+  || ehdr.e_type != 2
+  || ehdr.e_machine != 3
+  || ehdr.e_version != 1
+  || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
+  || ehdr.e_phnum > 1024)
+  {
+    lock_release(&file_lock);
+    printf ("load: %s: error loading executable\n", file_name);
+    goto done;
+  }
+  lock_release(&file_lock);
+
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++)
-    {
-      struct Elf32_Phdr phdr;
+  {
+    struct Elf32_Phdr phdr;
 
-      if (file_ofs < 0 || file_ofs > file_length (file))
-        goto done;
-      file_seek (file, file_ofs);
-
-      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-        goto done;
-      file_ofs += sizeof phdr;
-      switch (phdr.p_type)
-        {
-        case PT_NULL:
-        case PT_NOTE:printf("here is argv : %s\n\n\n\n\n\n\n", argv[0]);
-        case PT_PHDR:
-        case PT_STACK:
-        default:
-          /* Ignore this segment. */
-          break;
-        case PT_DYNAMIC:
-        case PT_INTERP:
-        case PT_SHLIB:
-          goto done;
-        case PT_LOAD:
-          if (validate_segment (&phdr, file))
-            {
-              bool writable = (phdr.p_flags & PF_W) != 0;
-              uint32_t file_page = phdr.p_offset & ~PGMASK;
-              uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
-              uint32_t page_offset = phdr.p_vaddr & PGMASK;
-              uint32_t read_bytes, zero_bytes;
-              if (phdr.p_filesz > 0)
-                {
-                  /* Normal segment.
-                     Read initial part from disk and zero the rest. */
-                  read_bytes = page_offset + phdr.p_filesz;
-                  zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-                                - read_bytes);
-                }
-              else
-                {
-                  /* Entirely zero.
-                     Don't read anything from disk. */
-                  read_bytes = 0;
-                  zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-                }
-              if (!load_segment (file, file_page, (void *) mem_page,
-                                 read_bytes, zero_bytes, writable))
-                goto done;
-            }
-          else
-            goto done;
-          break;
-        }
+    lock_acquire(&file_lock);
+    if (file_ofs < 0 || file_ofs > file_length (file)) {
+      lock_release(&file_lock);
+      goto done;
     }
+    lock_release(&file_lock);
+
+    lock_acquire(&file_lock);
+    file_seek (file, file_ofs);
+    lock_release(&file_lock);
+
+    lock_acquire(&file_lock);
+    if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
+      lock_release(&file_lock);
+      goto done;
+    }
+    lock_release(&file_lock);
+
+    file_ofs += sizeof phdr;
+    switch (phdr.p_type)
+    {
+      case PT_NULL:
+      case PT_NOTE:printf("here is argv : %s\n\n\n\n\n\n\n", argv[0]);
+      case PT_PHDR:
+      case PT_STACK:
+      default:
+      /* Ignore this segment. */
+      break;
+      case PT_DYNAMIC:
+      case PT_INTERP:
+      case PT_SHLIB:
+      goto done;
+      case PT_LOAD:
+      if (validate_segment (&phdr, file))
+      {
+        bool writable = (phdr.p_flags & PF_W) != 0;
+        uint32_t file_page = phdr.p_offset & ~PGMASK;
+        uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
+        uint32_t page_offset = phdr.p_vaddr & PGMASK;
+        uint32_t read_bytes, zero_bytes;
+        if (phdr.p_filesz > 0)
+        {
+          /* Normal segment.
+          Read initial part from disk and zero the rest. */
+          read_bytes = page_offset + phdr.p_filesz;
+          zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
+          - read_bytes);
+        }
+        else
+        {
+          /* Entirely zero.
+          Don't read anything from disk. */
+          read_bytes = 0;
+          zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
+        }
+        if (!load_segment (file, file_page, (void *) mem_page,
+        read_bytes, zero_bytes, writable))
+        goto done;
+      }
+      else
+      goto done;
+      break;
+    }
+  }
 
   /* Set up stack. */
   if (!setup_stack (esp, argc, argv))
-    goto done;
+  goto done;
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
- done:
- /* We arrive here whether the load is successful or not. */
-thread_current()->executable = file;
-if (success) {
-   file_deny_write(file);
- } 
+  done:
+  /* We arrive here whether the load is successful or not. */
+  thread_current()->executable = file;
+  if (success) {
+    lock_acquire(&file_lock);
+    file_deny_write(file);
+    lock_release(&file_lock);
+  }
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
 
-/* Checks whether PHDR describes a valid, loadable segment in
+/* * Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
 static bool
 validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
@@ -430,8 +474,12 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
     return false;
 
   /* p_offset must point within FILE. */
-  if (phdr->p_offset > (Elf32_Off) file_length (file))
+  lock_acquire(&file_lock);
+  if (phdr->p_offset > (Elf32_Off) file_length (file)) {
+    lock_release(&file_lock);
     return false;
+  }
+  lock_release(&file_lock);
 
   /* p_memsz must be at least as big as p_filesz. */
   if (phdr->p_memsz < phdr->p_filesz)
@@ -557,9 +605,9 @@ setup_stack (void **esp, int argc, char **argv)
       /* Push argv onto the stack in reverse order */
       char_esp = (char *) *esp;
       for (i = argc - 1; i >= 0; i--) {
-        char_esp -= (strlen(argv[i]) + 1);    // Decrement pointer for argument
-        strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);    // copy argument
-        argv_addr[i] = char_esp;         // Save argument's address on stack
+        char_esp -= (strlen(argv[i]) + 1);    // Decrement pointer
+        strlcpy(char_esp, argv[i], strlen(argv[i]) + 1);   // copy argument
+        argv_addr[i] = char_esp;        // Save argument's address on stack
       }
 
       *esp = char_esp;      // Update stack pointer
@@ -568,14 +616,15 @@ setup_stack (void **esp, int argc, char **argv)
       align_esp = (uint8_t *) *esp;
       word_align = 0;
 
-      while ((uint32_t)align_esp & 0x3) {       // Address is not a multiple of 4
+      while ((uint32_t)align_esp & 0x3) {
+        // Address is not a multiple of 4
         align_esp--;
         *align_esp = word_align;      // Write the number to stack
       }
 
-      *esp = (uint8_t *) align_esp;               // Update stack pointer
+      *esp = align_esp;               // Update stack pointer
 
-      /* Push arguments' addresses on stack onto the stack in reverse order */
+      /* Push arguments' addresses on stack to the stack in reverse order. */
       char_ptr_esp = (char **) *esp;
 
       // Write address 0 indicating end of arguments

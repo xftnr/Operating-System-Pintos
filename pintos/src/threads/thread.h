@@ -123,8 +123,11 @@ struct thread
   struct list_elem child_elem;     /* List element for child list. */
   bool waited_once;                /* Whether has already been waited once. */
   struct semaphore wait_mutex;     /* Synchronize waiting for this thread. */
+  struct semaphore exit_mutex;     /* Synchronize exiting for this thread. */
   int exit_status;                 /* Status of this thread when exited. */
 
+  /* Project 4. */
+  struct dir *current_directory;      /* Current directory of the thread. */
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */

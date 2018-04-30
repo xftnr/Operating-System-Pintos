@@ -15,6 +15,7 @@
 #include "threads/malloc.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/inode.h"
 #include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
@@ -36,9 +37,6 @@ static bool mkdir (const char *dir);
 static bool readdir (int fd, char *name);
 static bool isdir (int fd);
 static int inumber (int fd);
-
-
-struct lock file_lock;        /* Synchronizea calls to file system. */
 
 /* Checks stack pointer
 * If the user provides an invalid pointer, a pointer into kernel memory,
@@ -159,30 +157,30 @@ syscall_handler (struct intr_frame *f)
       close((int)*(esp + 1));
       break;
     // Directory
-    // case SYS_CHDIR:
-    //   check_esp((void *)(esp + 1));
-    //   check_esp((void *)*(esp + 1));
-    //   f->eax = chdir((const char *)*(esp + 1));
-    //   break;
-    // case SYS_MKDIR:
-    //   check_esp((void *)(esp + 1));
-    //   check_esp((void *)*(esp + 1));
-    //   f->eax = mkdir((const char *)*(esp + 1));
-    //   break;
+    case SYS_CHDIR:
+      check_esp((void *)(esp + 1));
+      check_esp((void *)*(esp + 1));
+      f->eax = chdir((const char *)*(esp + 1));
+      break;
+    case SYS_MKDIR:
+      check_esp((void *)(esp + 1));
+      check_esp((void *)*(esp + 1));
+      f->eax = mkdir((const char *)*(esp + 1));
+      break;
     // case SYS_READDIR:
     //   check_esp((void *)(esp + 1));
     //   check_esp((void *)(esp + 2));
     //   check_esp((void *)*(esp + 2));
     //   f->eax = readdir((int)*(esp + 1), (const void *)*(esp + 2));
     //   break;
-    // case SYS_ISDIR:
-    //   check_esp((void *)(esp + 1));
-    //   f->eax = isdir((int)*(esp + 1));
-    //   break;
-    // case SYS_INUMBER:
-    //   check_esp((void *)(esp + 1));
-    //   f->eax = inumber((int)*(esp + 1));
-    //   break;
+    case SYS_ISDIR:
+      check_esp((void *)(esp + 1));
+      f->eax = isdir((int)*(esp + 1));
+      break;
+    case SYS_INUMBER:
+      check_esp((void *)(esp + 1));
+      f->eax = inumber((int)*(esp + 1));
+      break;
     default:
       printf("System Call not implemented.\n");
   }
@@ -212,11 +210,8 @@ exit (int status) {
 // Pengdi driving
 pid_t
 exec (const char *cmd_line){
-  /* Synchronizes file system calls in process_execute. */
-  lock_acquire(&file_lock);
   tid_t tid;
   tid = process_execute(cmd_line);
-  lock_release(&file_lock);
   return tid;
 }
 
@@ -252,6 +247,10 @@ write (int fd, const void *buffer, unsigned size) {
     }
 
     struct file *cur = cur_info->file_temp;
+    if (inode_isdir(file_get_inode(cur))) {
+      lock_release(&file_lock);
+      return -1;
+    }
     int result = file_write (cur, buffer, size);
     lock_release(&file_lock);
     return result;
@@ -267,7 +266,7 @@ write (int fd, const void *buffer, unsigned size) {
 bool
 create (const char *file, unsigned initial_size) {
   lock_acquire(&file_lock);
-  bool result = filesys_create(file, initial_size);
+  bool result = filesys_create(file, initial_size, false);
   lock_release(&file_lock);
   return result;
 }
@@ -289,6 +288,9 @@ remove (const char *file) {
 */
 int
 open (const char *file){
+  if (strlen(file) == 0) {
+    return -1;
+  }
   lock_acquire(&file_lock);
   struct file *cur = filesys_open(file);
   if (cur == NULL) {
@@ -425,18 +427,61 @@ close_file (struct file *file) {
   lock_release(&file_lock);
 }
 
+bool
+chdir (const char *dir) {
+  lock_acquire(&file_lock);
+  bool result = filesys_chdir(dir);
+  lock_release(&file_lock);
+  return result;
+}
+
+bool
+mkdir (const char *dir) {
+  lock_acquire(&file_lock);
+  bool result = filesys_create(dir, 0, true);
+  lock_release(&file_lock);
+  return result;
+}
 
 // bool
-// chdir (const char *dir);
+// readdir (int fd, char *name) {
 //
-// bool
-// mkdir (const char *dir);
-//
-// bool
-// readdir (int fd, char *name);
-//
-// bool
-// isdir (int fd);
-//
-// int
-// inumber (int fd);
+// }
+
+bool
+isdir (int fd) {
+  lock_acquire(&file_lock);
+
+  struct file_info *cur_info = get_file(fd);
+  if (cur_info == NULL) {
+    /* No such open file fd for current process. */
+    lock_release(&file_lock);
+    exit(-1);
+  }
+
+  struct file *cur = cur_info->file_temp;
+  struct inode *inode = file_get_inode(cur);
+  bool result = inode_isdir(inode);
+  lock_release(&file_lock);
+
+  return result;
+}
+
+int
+inumber (int fd) {
+  lock_acquire(&file_lock);
+
+  struct file_info *cur_info = get_file(fd);
+  if (cur_info == NULL) {
+    /* No such open file fd for current process. */
+    lock_release(&file_lock);
+    exit(-1);
+  }
+
+  struct file *cur = cur_info->file_temp;
+  struct inode *inode = file_get_inode(cur);
+  int result = (int)inode_get_inumber(inode);
+  lock_release(&file_lock);
+
+  return result;
+}

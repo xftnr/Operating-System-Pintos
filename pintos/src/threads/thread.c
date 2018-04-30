@@ -17,8 +17,10 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
+
 #ifdef USERPROG
 
 #endif
@@ -205,7 +207,6 @@ thread_create (const char *name, int priority,
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
-  tid_t tid;
 
   ASSERT (function != NULL);
 
@@ -234,11 +235,17 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  if (thread_current()->current_directory != NULL) {
+    t->current_directory = dir_reopen(thread_current()->current_directory);
+  } else {
+    // t->current_directory = dir_open_root();
+    t->current_directory = NULL;
+  }
+
   /* Add to ready queue. */
   thread_unblock (t);
 
   // Yige, Pengdi driving
-
   if (thread_current()->calling_exec) {
     /* Thread t is a child thread of current thread. */
     list_push_back (&thread_current()->child_list, &t->child_elem);
@@ -290,7 +297,7 @@ thread_block (void)
 // Yige Driving
 bool compare_priorities(const struct list_elem *a,
                    const struct list_elem *b,
-                   void *aux) {
+                   void *aux UNUSED) {
   struct thread *t1 = NULL;
   struct thread *t2 = NULL;
 
@@ -378,53 +385,51 @@ thread_exit (void)
   process_exit ();
 #endif
 
-// Yige, Pengdi, Peijie, Wei Po driving
+  // Yige, Pengdi, Peijie, Wei Po driving
 
-/* Destroys current thread's relationship with all its child threads. */
-for (e = list_begin (&thread_current()->child_list);
-      e!= list_end (&thread_current()->child_list); e = list_next (e)) {
-  child = list_entry (e, struct thread, child_elem);
-  e = e->prev;
-  list_remove(&child->child_elem);
-
-  if (child->status == THREAD_DYING) {
-    /* Child exited. Free child resources. */
-    palloc_free_page (child);
-  } else {
-    /* Child is alive, remove relationship. Child becomes orphan. */
-    child->child_elem.prev = NULL;
-    child->child_elem.next = NULL;
+  /* Destroys current thread's relationship with all its child threads. */
+  for (e = list_begin (&thread_current()->child_list);
+  e!= list_end (&thread_current()->child_list); e = list_next (e)) {
+    child = list_entry (e, struct thread, child_elem);
+    e = e->prev;
+    list_remove(&child->child_elem);
+    sema_up(&child->exit_mutex);    /* Let child thread free its resouces. */
   }
-}
 
-/* Closes open files of current thread and frees resources. */
-for (e = list_begin (&thread_current()->file_list);
-      e!= list_end (&thread_current()->file_list); e = list_next (e)) {
-  f_i = list_entry (e, struct file_info, file_elem);
-  e = e->prev;
-  list_remove(&f_i->file_elem);
-  close_file(f_i->file_temp);
-  free(f_i);
-}
+  /* Closes open files of current thread and frees resources. */
+  for (e = list_begin (&thread_current()->file_list);
+  e!= list_end (&thread_current()->file_list); e = list_next (e)) {
+    f_i = list_entry (e, struct file_info, file_elem);
+    e = e->prev;
+    list_remove(&f_i->file_elem);
+    close_file(f_i->file_temp);
+    free(f_i);
+  }
 
-/* Releases all locks current thread holds. */
-for (e = list_begin (&thread_current()->lock_holding);
-      e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
-  l = list_entry (e, struct lock, holding_elem);
-  lock_release(l);
-}
+  /* Releases all locks current thread holds. */
+  for (e = list_begin (&thread_current()->lock_holding);
+  e!= list_end (&thread_current()->lock_holding); e = list_next (e)) {
+    l = list_entry (e, struct lock, holding_elem);
+    lock_release(l);
+  }
 
-/* Close executable file of terminating thread,
+  /* Close executable file of terminating thread,
   allows write to file automatically. */
-close_file(thread_current ()->executable);
+  close_file(thread_current ()->executable);
+
+  /* Notices parent that it exited. */
+  sema_up(&thread_current()->wait_mutex);
+  /* Waits for parent thread to reap. */
+  sema_down(&thread_current()->exit_mutex);
 
   /* Remove thread from all threads list, set our status to dying,
-     and schedule another process.  That process will destroy us
-     when it calls thread_schedule_tail(). */
+  and schedule another process.  That process will destroy us
+  when it calls thread_schedule_tail(). */
   intr_disable ();
 
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+
 
   schedule ();
   NOT_REACHED ();
@@ -647,6 +652,10 @@ init_thread (struct thread *t, const char *name, int priority)
   the parent thread can wait for this thread to exit. */
   sema_init(&t->wait_mutex, 0);
 
+  /* Initializes semaphore for exiting for this thread to 0 so
+  the child thread can wait for its parent to wait or exit. */
+  sema_init(&t->exit_mutex, 0);
+
   /* Becomes true when parent waits for this thread for the first time. */
   t->waited_once = false;
 
@@ -732,14 +741,7 @@ thread_schedule_tail (struct thread *prev)
      if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
      {
        ASSERT (prev != cur);
-
-       if (prev->child_elem.prev == NULL && prev->child_elem.next == NULL) {
-         /* Orpahn thread, frees resources. */
-         palloc_free_page(prev);
-       } else {
-         /* Child thread, notices parent that it exited. */
-         sema_up(&prev->wait_mutex);
-       }
+       palloc_free_page(prev);
      }
 }
 
