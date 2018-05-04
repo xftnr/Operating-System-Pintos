@@ -23,15 +23,15 @@
 Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
 {
-  /* A total of 12 entries with 10 direct blocks, 1 inderect block,
+  /* A total of 12 entries with 10 direct blocks, 1 indirect block,
   and 1 double-indirect block. */
   block_sector_t direct_blocks[DIRECT_NUM];
   block_sector_t indirect_block;
   block_sector_t double_indirect_block;
   bool isdir;                         /* Directory or file? */
 
-  off_t length;                       /* File size in bytes. */
   off_t eof;                          /* EOF for readers. */
+  off_t length;                       /* File size in bytes. */
   unsigned magic;                     /* Magic number. */
   uint32_t unused[112];               /* Not used. */
 };
@@ -53,7 +53,7 @@ struct inode
   bool removed;                       /* True if deleted, false otherwise. */
   int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
   struct inode_disk data;             /* Inode content. */
-  struct lock inode_lock;             /* Synchronize file extension. */
+  struct lock inode_lock;             /* Synchronize changes to files. */
 };
 
 /* Returns the block device sector that contains byte offset POS
@@ -609,7 +609,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     bytes_written += chunk_size;
   }
 
-  /* Updates file length */
+  /* Updates file read length */
   if (new_length > inode_disk->eof) {
     inode_disk->eof = new_length;
     block_write (fs_device, inode->sector, inode_disk);

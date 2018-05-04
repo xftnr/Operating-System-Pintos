@@ -153,11 +153,16 @@ get_dir(const char *path) {
 
   strlcpy(s, path, strlen(path) + 1);
 
-  if (s[0] == '/' || thread_current()->current_directory == NULL) {
-    // absolute path or current directory is root directory
+  if (s[0] == '/') {
+    // absolute path
     cur_dir = dir_open_root();
   } else {
-    cur_dir = dir_reopen(thread_current()->current_directory);
+    // start with thread's cwd
+    if (thread_current()->current_directory == NULL) {
+      cur_dir = dir_open_root();
+    } else {
+      cur_dir = dir_reopen(thread_current()->current_directory);
+    }
   }
 
   /* Traverse the diretories. */
