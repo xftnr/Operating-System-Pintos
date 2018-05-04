@@ -246,6 +246,7 @@ dir_remove (struct dir *dir, const char *name)
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
+  // lock_acquire(&inode->inode_lock);
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
@@ -257,19 +258,22 @@ dir_remove (struct dir *dir, const char *name)
     goto done;
   }
 
-  /* Checks whether this directory is empty. */
+  /* Checks whether this directory is in use or empty. */
   if (inode_isdir(inode)) {
+    if ( inode_is_open(inode)) {
+      goto done;
+    }
     struct dir_entry e1;
     off_t ofs1;
     struct dir *to_remove = dir_open(inode);
     for (ofs1 = 2*(sizeof e1); inode_read_at (inode, &e1,
-    sizeof e1, ofs1) == sizeof e1;
-    ofs1 += sizeof e1) {
-      if (e1.in_use) {
-        goto done;
+      sizeof e1, ofs1) == sizeof e1;
+      ofs1 += sizeof e1) {
+        if (e1.in_use) {
+          goto done;
+        }
       }
     }
-  }
 
   /* Erase directory entry. */
   e.in_use = false;

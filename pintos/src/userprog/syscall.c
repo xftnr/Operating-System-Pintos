@@ -232,28 +232,28 @@ wait (pid_t pid) {
 // Wei Po driving
 int
 write (int fd, const void *buffer, unsigned size) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   if (fd == 1) {
     /* Writes to standard output. */
     putbuf (buffer, size);
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return size;
   } else if (fd != 0){
     /* Writes to open file fd. */
     struct file_info *cur_info = get_file(fd);
     if (cur_info == NULL) {
       /* No such open file fd for current process. */
-      lock_release(&file_lock);
+      //lock_release(&file_lock);
       exit(-1);
     }
     struct file *cur = cur_info->file_temp;
     /* Cannot write to directory. */
     if (inode_isdir(file_get_inode(cur))) {
-      lock_release(&file_lock);
+      //lock_release(&file_lock);
       return -1;
     }
     int result = file_write (cur, buffer, size);
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return result;
   } else {  /* Never writes to standard input. */
     exit(-1);
@@ -266,10 +266,10 @@ write (int fd, const void *buffer, unsigned size) {
 // Yige driving
 bool
 create (const char *file, unsigned initial_size) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   /* Create an inode with isdir as false. */
   bool result = filesys_create(file, initial_size, false);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -278,9 +278,9 @@ create (const char *file, unsigned initial_size) {
 */
 bool
 remove (const char *file) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   bool result = filesys_remove(file);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -293,17 +293,17 @@ open (const char *file){
   if (strlen(file) == 0) {
     return -1;
   }
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   struct file *cur = filesys_open(file);
   if (cur == NULL) {
     /* No file named NAME exists, or an internal memory allocation fails. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return -1;
   }
   struct file_info *cur_info = malloc(sizeof(struct file_info));
   if (cur_info == NULL) {
     /* Malloc failed. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return -1;
   }
   cur_info->file_temp = cur;
@@ -320,7 +320,7 @@ open (const char *file){
   thread_current()->fd++;      /* Updates next fd for open file. */
   /* Adds file to current thread's list of open files. */
   list_push_back (&thread_current()->file_list, &cur_info->file_elem);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return cur_info->fd;
 }
 
@@ -329,18 +329,18 @@ open (const char *file){
 // Wei Po driving
 int
 filesize (int fd) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   int result = file_length(cur);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -350,18 +350,18 @@ filesize (int fd) {
 */
 int
 read (int fd, void *buffer, unsigned size) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   int result = file_read (cur, buffer, size);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -370,18 +370,18 @@ read (int fd, void *buffer, unsigned size) {
 */
 void
 seek (int fd, unsigned position) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   file_seek (cur, position);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
 }
 
 /* Returns the position of the next byte to be read or written
@@ -389,18 +389,18 @@ seek (int fd, unsigned position) {
 */
 unsigned
 tell (int fd) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   unsigned result = file_tell (cur);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -409,12 +409,12 @@ tell (int fd) {
 // Yige driving
 void
 close (int fd) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
@@ -429,7 +429,7 @@ close (int fd) {
   }
 
   free(cur_info);     /* Frees memory allocated. */
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
 }
 
 /* Closes open file file.
@@ -437,9 +437,9 @@ close (int fd) {
 */
 void
 close_file (struct file *file) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   file_close (file);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
 }
 
 /* Changes the current working directory of the process to dir,
@@ -448,9 +448,9 @@ Returns true if successful, false on failure.
 */
 bool
 chdir (const char *dir) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   bool result = filesys_chdir(dir);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -461,9 +461,9 @@ besides the last, does not already exist.
 */
 bool
 mkdir (const char *dir) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
   bool result = filesys_create(dir, 0, true);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -475,12 +475,12 @@ If no entries are left in the directory, returns false.
 */
 bool
 readdir (int fd, char *name) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return false;
   }
 
@@ -488,13 +488,13 @@ readdir (int fd, char *name) {
   struct inode *inode = file_get_inode(cur);
 
   if(inode == NULL) {
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return false;
   }
 
   /* Must read a directory. */
   if (!inode_isdir(inode)) {
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     return false;
   }
 
@@ -507,7 +507,7 @@ readdir (int fd, char *name) {
     result = dir_readdir(cur_info->dir_temp, name);
   }
 
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
   return result;
 }
 
@@ -516,19 +516,19 @@ false if it represents an ordinary file.
 */
 bool
 isdir (int fd) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   struct inode *inode = file_get_inode(cur);
   bool result = inode_isdir(inode);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
 
   return result;
 }
@@ -538,19 +538,19 @@ which may represent an ordinary file or a directory.
 */
 int
 inumber (int fd) {
-  lock_acquire(&file_lock);
+  //lock_acquire(&file_lock);
 
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    lock_release(&file_lock);
+    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   struct inode *inode = file_get_inode(cur);
   int result = (int)inode_get_inumber(inode);
-  lock_release(&file_lock);
+  //lock_release(&file_lock);
 
   return result;
 }
