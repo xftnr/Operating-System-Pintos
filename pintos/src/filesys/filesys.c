@@ -1,3 +1,8 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang, Wei Po Chen
+* Date: 04/30/2018
+* Description: Top-level interface to the file system.
+*/
 #include "filesys/filesys.h"
 #include <debug.h>
 #include <stdio.h>
@@ -39,40 +44,42 @@ filesys_done (void)
   free_map_close ();
 }
 
+/* Returns the name of file or directory needed in the path. */
 char *
 get_name(const char *path) {
   char *s = NULL;             /* Temperary string to hold the path */
   char *prev_token = "";         /* Previous tokenized argument */
-  char *token = NULL;         /* Tokenized argument */
-  char *save_ptr = NULL;      /* Saved position in String */
+  char *token = NULL;            /* Tokenized argument */
+  char *save_ptr = NULL;         /* Saved position in String */
   char *file_name = NULL;         /* Tokenized argument */
 
+  /* Traverse the string to find the last name in path */
   s = malloc (strlen(path) + 1);
   strlcpy(s, path, strlen(path) + 1);
-
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
   token = strtok_r (NULL, "/", &save_ptr)) {
+    /* Keeps the previous token because token will be NULL. */
     prev_token = token;
   }
 
   file_name = malloc (strlen(prev_token) + 1);
   strlcpy(file_name, prev_token, strlen(prev_token) + 1);
 
-  // printf("path %s\n\n", s);
-  //
-  // printf("name %s\n\n", file_name);
-
   free(s);
 
   return file_name;
 }
 
+/* Changes the current working directory of the process to dir,
+which may be relative or absolute.
+Returns true if successful, false on failure */
 bool
 filesys_chdir (const char *path) {
   struct dir *dir = get_dir(path);
   if (dir == NULL) {
     return false;
   }
+  /* Close old working directory. */
   dir_close(thread_current()->current_directory);
   thread_current()->current_directory = dir;
   return true;
@@ -87,11 +94,15 @@ bool
 filesys_create (const char *path, off_t initial_size, bool isdir)
 {
   block_sector_t inode_sector = 0;
+  /* Gets the name of file to be created. */
   char *file_name = get_name(path);
+
+  /* Gets the path to directory the file is in. */
   char *dir_path = malloc(strlen(path) - strlen(file_name) + 1);
   strlcpy(dir_path, path, strlen(path) - strlen(file_name) + 1);
+
+  /* Gets the parent directory. */
   struct dir *parent_dir = get_dir(dir_path);
-  // struct dir *dir = dir_open_root ();
   bool success = (parent_dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, isdir)
@@ -99,13 +110,16 @@ filesys_create (const char *path, off_t initial_size, bool isdir)
   if (success && isdir) {
     struct inode *inode = inode_open (inode_sector);
 
+    /* Add "." and ".." as directory entry */
     struct dir *child_dir = dir_open(inode);
     if (! dir_add(child_dir, ".", inode_sector)) {
       PANIC ("directory adding . failed");
     }
-    if (! dir_add(child_dir, "..", inode_get_inumber(dir_get_inode(parent_dir)))) {
+    if (! dir_add(child_dir, "..",
+        inode_get_inumber(dir_get_inode(parent_dir)))) {
       PANIC ("directory adding .. failed");
     }
+
     dir_close (child_dir);
     inode_close (inode);
   }
@@ -125,9 +139,14 @@ filesys_create (const char *path, off_t initial_size, bool isdir)
 struct file *
 filesys_open (const char *path)
 {
+  /* Gets the name of file to be created. */
   char *file_name = get_name(path);
+
+  /* Gets the path to directory the file is in. */
   char *dir_path = malloc(strlen(path) - strlen(file_name) + 1);
   strlcpy(dir_path, path, strlen(path) - strlen(file_name) + 1);
+
+  /* Gets the parent directory. */
   struct dir *dir = get_dir(dir_path);
 
   if (dir == NULL) {
@@ -136,6 +155,7 @@ filesys_open (const char *path)
 
   struct inode *inode = NULL;
   if (strlen(file_name) == 0) {
+    /* File name is emtpy, open current file. */
     inode = dir_get_inode(dir);
   } else {
     dir_lookup (dir, file_name, &inode);
@@ -156,9 +176,14 @@ filesys_open (const char *path)
 bool
 filesys_remove (const char *path)
 {
+  /* Gets the name of file to be created. */
   char *file_name = get_name(path);
+
+  /* Gets the path to directory the file is in. */
   char *dir_path = malloc(strlen(path) - strlen(file_name) + 1);
   strlcpy(dir_path, path, strlen(path) - strlen(file_name) + 1);
+
+  /* Gets the parent directory. */
   struct dir *dir = get_dir(dir_path);
 
   bool success = dir != NULL && dir_remove (dir, file_name);

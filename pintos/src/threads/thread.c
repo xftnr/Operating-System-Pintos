@@ -235,10 +235,10 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  /* Initializes current working directory. */
   if (thread_current()->current_directory != NULL) {
     t->current_directory = dir_reopen(thread_current()->current_directory);
   } else {
-    // t->current_directory = dir_open_root();
     t->current_directory = NULL;
   }
 

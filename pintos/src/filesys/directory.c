@@ -1,3 +1,9 @@
+/*
+* Authors: Yige Wang, Pengdi Xia, Peijie Yang, Wei Po Chen
+* Date: 04/30/2018
+* Description: Translates file names to inodes.
+*              The directory data structure is stored as a file.
+*/
 #include "filesys/directory.h"
 #include <stdio.h>
 #include <string.h>
@@ -6,7 +12,6 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
-
 
 /* A directory. */
 struct dir
@@ -36,15 +41,9 @@ dir_create (block_sector_t sector, size_t entry_cnt)
 struct dir *
 dir_open (struct inode *inode)
 {
-
-// printf("dir open %d\n", inode_get_inumber(inode));
-
   struct dir *dir = calloc (1, sizeof *dir);
   if (inode != NULL && dir != NULL)
     {
-
-      // printf("here\n");
-
       dir->inode = inode;
       dir->pos = 0;
       return dir;
@@ -62,8 +61,6 @@ dir_open (struct inode *inode)
 struct dir *
 dir_open_root (void)
 {
-  // printf("dir_open_root\n");
-
   return dir_open (inode_open (ROOT_DIR_SECTOR));
 }
 
@@ -142,10 +139,13 @@ dir_lookup (const struct dir *dir, const char *name,
   return *inode != NULL;
 }
 
+/* Get the parent directory (second to the last) in the path.
+If path starts with "/", satrt traversing with root directory
+Else, start with current working directory of current thread.
+*/
 struct dir *
 get_dir(const char *path) {
-
-  char s[strlen(path) + 1];             /* Temperary string to hold the path */
+  char s[strlen(path) + 1];           /* Temperary string to hold the path */
   char *token = NULL;         /* Directory name */
   char *save_ptr = NULL;      /* Saved position in String */
   struct dir *cur_dir = NULL;
@@ -159,9 +159,10 @@ get_dir(const char *path) {
     cur_dir = dir_reopen(thread_current()->current_directory);
   }
 
+  /* Traverse the diretories. */
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
   token = strtok_r (NULL, "/", &save_ptr)) {
-    struct inode *inode = NULL;       /* inode of the directory named token. */
+    struct inode *inode = NULL;      /* inode of the directory named token. */
     if (!dir_lookup (cur_dir, token, &inode)) {
       dir_close(cur_dir);
       return NULL;
@@ -177,6 +178,7 @@ get_dir(const char *path) {
     cur_dir = sub_dir;
   }
 
+  /* Don't open removed directory. */
   if (inode_is_removed(dir_get_inode(cur_dir))) {
     dir_close(cur_dir);
     return NULL;
@@ -255,11 +257,13 @@ dir_remove (struct dir *dir, const char *name)
     goto done;
   }
 
+  /* Checks whether this directory is empty. */
   if (inode_isdir(inode)) {
     struct dir_entry e1;
     off_t ofs1;
     struct dir *to_remove = dir_open(inode);
-    for (ofs1 = 2*(sizeof e1); inode_read_at (inode, &e1, sizeof e1, ofs1) == sizeof e1;
+    for (ofs1 = 2*(sizeof e1); inode_read_at (inode, &e1,
+    sizeof e1, ofs1) == sizeof e1;
     ofs1 += sizeof e1) {
       if (e1.in_use) {
         goto done;

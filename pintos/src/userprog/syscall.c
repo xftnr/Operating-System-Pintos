@@ -246,8 +246,8 @@ write (int fd, const void *buffer, unsigned size) {
       lock_release(&file_lock);
       exit(-1);
     }
-
     struct file *cur = cur_info->file_temp;
+    /* Cannot write to directory. */
     if (inode_isdir(file_get_inode(cur))) {
       lock_release(&file_lock);
       return -1;
@@ -267,6 +267,7 @@ write (int fd, const void *buffer, unsigned size) {
 bool
 create (const char *file, unsigned initial_size) {
   lock_acquire(&file_lock);
+  /* Create an inode with isdir as false. */
   bool result = filesys_create(file, initial_size, false);
   lock_release(&file_lock);
   return result;
@@ -307,6 +308,7 @@ open (const char *file){
   }
   cur_info->file_temp = cur;
 
+  /* Add directory to file info of this file. */
   struct inode *inode = file_get_inode(cur);
   if (inode != NULL && inode_isdir(inode)) {
     cur_info->dir_temp = dir_open(inode_reopen(inode));
@@ -421,6 +423,7 @@ close (int fd) {
 
   file_close (cur_info->file_temp);
 
+  /* Close directory if inode is a directory. */
   if (cur_info->dir_temp != NULL) {
     dir_close(cur_info->dir_temp);
   }
@@ -439,6 +442,10 @@ close_file (struct file *file) {
   lock_release(&file_lock);
 }
 
+/* Changes the current working directory of the process to dir,
+which may be relative or absolute.
+Returns true if successful, false on failure.
+*/
 bool
 chdir (const char *dir) {
   lock_acquire(&file_lock);
@@ -447,6 +454,11 @@ chdir (const char *dir) {
   return result;
 }
 
+/* Creates the directory named dir, which may be relative or absolute.
+Returns true if successful, false on failure.
+Fails if dir already exists or if any directory name in dir,
+besides the last, does not already exist.
+*/
 bool
 mkdir (const char *dir) {
   lock_acquire(&file_lock);
@@ -455,6 +467,12 @@ mkdir (const char *dir) {
   return result;
 }
 
+/* Reads a directory entry from file descriptor fd,
+which must represent a directory. If successful,
+stores the null-terminated file name in name,
+which must have room for READDIR_MAX_LEN + 1 bytes, and returns true.
+If no entries are left in the directory, returns false.
+*/
 bool
 readdir (int fd, char *name) {
   lock_acquire(&file_lock);
@@ -474,11 +492,13 @@ readdir (int fd, char *name) {
     return false;
   }
 
+  /* Must read a directory. */
   if (!inode_isdir(inode)) {
     lock_release(&file_lock);
     return false;
   }
 
+  /* Skip "." and ".." */
   bool result = dir_readdir(cur_info->dir_temp, name);
   if (strcmp(name, ".") == 0) {
     result = dir_readdir(cur_info->dir_temp, name);
@@ -491,6 +511,9 @@ readdir (int fd, char *name) {
   return result;
 }
 
+/* Returns true if fd represents a directory,
+false if it represents an ordinary file.
+*/
 bool
 isdir (int fd) {
   lock_acquire(&file_lock);
@@ -510,6 +533,9 @@ isdir (int fd) {
   return result;
 }
 
+/* Returns the inode number of the inode associated with fd,
+which may represent an ordinary file or a directory.
+*/
 int
 inumber (int fd) {
   lock_acquire(&file_lock);
