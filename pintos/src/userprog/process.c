@@ -344,18 +344,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   palloc_free_page (s);
 
-  //lock_acquire(&file_lock);
-  file = filesys_open(argv[0]);
-  //lock_release(&file_lock);
-  if (file == NULL)
+    file = filesys_open(argv[0]);
+    if (file == NULL)
   {
     printf ("load: %s: open failed\n", file_name);
     goto done;
   }
 
   /* Read and verify executable header. */
-  //lock_acquire(&file_lock);
-  if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+    if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
   || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
   || ehdr.e_type != 2
   || ehdr.e_machine != 3
@@ -363,11 +360,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
   || ehdr.e_phnum > 1024)
   {
-    //lock_release(&file_lock);
-    printf ("load: %s: error loading executable\n", file_name);
+        printf ("load: %s: error loading executable\n", file_name);
     goto done;
   }
-  //lock_release(&file_lock);
 
 
   /* Read program headers. */
@@ -376,23 +371,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   {
     struct Elf32_Phdr phdr;
 
-    //lock_acquire(&file_lock);
-    if (file_ofs < 0 || file_ofs > file_length (file)) {
-      //lock_release(&file_lock);
-      goto done;
+        if (file_ofs < 0 || file_ofs > file_length (file)) {
+            goto done;
     }
-    //lock_release(&file_lock);
 
-    //lock_acquire(&file_lock);
-    file_seek (file, file_ofs);
-    //lock_release(&file_lock);
+        file_seek (file, file_ofs);
 
-    //lock_acquire(&file_lock);
-    if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
-      //lock_release(&file_lock);
-      goto done;
+        if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
+            goto done;
     }
-    //lock_release(&file_lock);
 
     file_ofs += sizeof phdr;
     switch (phdr.p_type)
@@ -454,10 +441,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* We arrive here whether the load is successful or not. */
   thread_current()->executable = file;
   if (success) {
-    //lock_acquire(&file_lock);
-    file_deny_write(file);
-    //lock_release(&file_lock);
-  }
+        file_deny_write(file);
+      }
   return success;
 }
 
@@ -475,12 +460,9 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
     return false;
 
   /* p_offset must point within FILE. */
-  //lock_acquire(&file_lock);
-  if (phdr->p_offset > (Elf32_Off) file_length (file)) {
-    //lock_release(&file_lock);
-    return false;
+    if (phdr->p_offset > (Elf32_Off) file_length (file)) {
+        return false;
   }
-  //lock_release(&file_lock);
 
   /* p_memsz must be at least as big as p_filesz. */
   if (phdr->p_memsz < phdr->p_filesz)

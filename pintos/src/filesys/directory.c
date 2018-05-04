@@ -143,6 +143,7 @@ dir_lookup (const struct dir *dir, const char *name,
 If path starts with "/", satrt traversing with root directory
 Else, start with current working directory of current thread.
 */
+// Wei Po Driving
 struct dir *
 get_dir(const char *path) {
   char s[strlen(path) + 1];           /* Temperary string to hold the path */
@@ -203,9 +204,11 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
+  inode_lock_acquire(dir_get_inode(dir));
+
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
-    return false;
+    goto done;
 
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
@@ -230,6 +233,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
+  inode_lock_release(dir_get_inode(dir));
   return success;
 }
 
@@ -246,7 +250,7 @@ dir_remove (struct dir *dir, const char *name)
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-  // lock_acquire(&inode->inode_lock);
+  inode_lock_acquire(dir_get_inode(dir));
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
@@ -258,9 +262,10 @@ dir_remove (struct dir *dir, const char *name)
     goto done;
   }
 
+  // Peijie Driving
   /* Checks whether this directory is in use or empty. */
   if (inode_isdir(inode)) {
-    if ( inode_is_open(inode)) {
+    if (inode_is_open(inode)) {
       goto done;
     }
     struct dir_entry e1;
@@ -286,6 +291,7 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
   inode_close (inode);
+  inode_lock_release(dir_get_inode(dir));
   return success;
 }
 
@@ -297,14 +303,18 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
 
+  inode_lock_acquire(dir_get_inode(dir));
+
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
       if (e.in_use)
         {
           strlcpy (name, e.name, NAME_MAX + 1);
+          inode_lock_release(dir_get_inode(dir));
           return true;
         }
     }
+  inode_lock_release(dir_get_inode(dir));
   return false;
 }

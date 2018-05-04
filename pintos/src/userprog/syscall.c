@@ -9,6 +9,7 @@
 #include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -76,7 +77,6 @@ void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init(&file_lock);
 }
 
 // Pengdi driving
@@ -232,29 +232,24 @@ wait (pid_t pid) {
 // Wei Po driving
 int
 write (int fd, const void *buffer, unsigned size) {
-  //lock_acquire(&file_lock);
-  if (fd == 1) {
+      if (fd == 1) {
     /* Writes to standard output. */
     putbuf (buffer, size);
-    //lock_release(&file_lock);
-    return size;
+        return size;
   } else if (fd != 0){
     /* Writes to open file fd. */
     struct file_info *cur_info = get_file(fd);
     if (cur_info == NULL) {
       /* No such open file fd for current process. */
-      //lock_release(&file_lock);
-      exit(-1);
+            exit(-1);
     }
     struct file *cur = cur_info->file_temp;
     /* Cannot write to directory. */
     if (inode_isdir(file_get_inode(cur))) {
-      //lock_release(&file_lock);
-      return -1;
+            return -1;
     }
     int result = file_write (cur, buffer, size);
-    //lock_release(&file_lock);
-    return result;
+        return result;
   } else {  /* Never writes to standard input. */
     exit(-1);
   }
@@ -266,11 +261,9 @@ write (int fd, const void *buffer, unsigned size) {
 // Yige driving
 bool
 create (const char *file, unsigned initial_size) {
-  //lock_acquire(&file_lock);
-  /* Create an inode with isdir as false. */
+      /* Create an inode with isdir as false. */
   bool result = filesys_create(file, initial_size, false);
-  //lock_release(&file_lock);
-  return result;
+    return result;
 }
 
 /* Deletes the file called file.
@@ -278,10 +271,8 @@ create (const char *file, unsigned initial_size) {
 */
 bool
 remove (const char *file) {
-  //lock_acquire(&file_lock);
-  bool result = filesys_remove(file);
-  //lock_release(&file_lock);
-  return result;
+      bool result = filesys_remove(file);
+    return result;
 }
 
 /* Opens the file called file.
@@ -293,18 +284,15 @@ open (const char *file){
   if (strlen(file) == 0) {
     return -1;
   }
-  //lock_acquire(&file_lock);
-  struct file *cur = filesys_open(file);
+      struct file *cur = filesys_open(file);
   if (cur == NULL) {
     /* No file named NAME exists, or an internal memory allocation fails. */
-    //lock_release(&file_lock);
-    return -1;
+        return -1;
   }
   struct file_info *cur_info = malloc(sizeof(struct file_info));
   if (cur_info == NULL) {
     /* Malloc failed. */
-    //lock_release(&file_lock);
-    return -1;
+        return -1;
   }
   cur_info->file_temp = cur;
 
@@ -320,8 +308,7 @@ open (const char *file){
   thread_current()->fd++;      /* Updates next fd for open file. */
   /* Adds file to current thread's list of open files. */
   list_push_back (&thread_current()->file_list, &cur_info->file_elem);
-  //lock_release(&file_lock);
-  return cur_info->fd;
+    return cur_info->fd;
 }
 
 /* Returns the size, in bytes, of the file open as fd.
@@ -329,19 +316,15 @@ open (const char *file){
 // Wei Po driving
 int
 filesize (int fd) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   int result = file_length(cur);
-  //lock_release(&file_lock);
-  return result;
+    return result;
 }
 
 /* Reads size bytes from the file open as fd into buffer.
@@ -350,19 +333,15 @@ filesize (int fd) {
 */
 int
 read (int fd, void *buffer, unsigned size) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   int result = file_read (cur, buffer, size);
-  //lock_release(&file_lock);
-  return result;
+    return result;
 }
 
 /* Changes the next byte to be read or written in open file fd to position,
@@ -370,38 +349,30 @@ read (int fd, void *buffer, unsigned size) {
 */
 void
 seek (int fd, unsigned position) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   file_seek (cur, position);
-  //lock_release(&file_lock);
-}
+  }
 
 /* Returns the position of the next byte to be read or written
 * in open file fd, expressed in bytes from the beginning of the file.
 */
 unsigned
 tell (int fd) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   unsigned result = file_tell (cur);
-  //lock_release(&file_lock);
-  return result;
+    return result;
 }
 
 /* Closes file descriptor fd. Remove file from file_list and frees resources.
@@ -409,13 +380,10 @@ tell (int fd) {
 // Yige driving
 void
 close (int fd) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   /* No longer a open file of current process. */
@@ -429,29 +397,25 @@ close (int fd) {
   }
 
   free(cur_info);     /* Frees memory allocated. */
-  //lock_release(&file_lock);
-}
+  }
 
 /* Closes open file file.
 * Used when exiting or terminating a process implicitly.
 */
 void
 close_file (struct file *file) {
-  //lock_acquire(&file_lock);
-  file_close (file);
-  //lock_release(&file_lock);
-}
+      file_close (file);
+  }
 
 /* Changes the current working directory of the process to dir,
 which may be relative or absolute.
 Returns true if successful, false on failure.
 */
+// Peijie Driving
 bool
 chdir (const char *dir) {
-  //lock_acquire(&file_lock);
-  bool result = filesys_chdir(dir);
-  //lock_release(&file_lock);
-  return result;
+      bool result = filesys_chdir(dir);
+    return result;
 }
 
 /* Creates the directory named dir, which may be relative or absolute.
@@ -459,12 +423,11 @@ Returns true if successful, false on failure.
 Fails if dir already exists or if any directory name in dir,
 besides the last, does not already exist.
 */
+// Wei Po Driving
 bool
 mkdir (const char *dir) {
-  //lock_acquire(&file_lock);
-  bool result = filesys_create(dir, 0, true);
-  //lock_release(&file_lock);
-  return result;
+      bool result = filesys_create(dir, 0, true);
+    return result;
 }
 
 /* Reads a directory entry from file descriptor fd,
@@ -473,29 +436,25 @@ stores the null-terminated file name in name,
 which must have room for READDIR_MAX_LEN + 1 bytes, and returns true.
 If no entries are left in the directory, returns false.
 */
+// Yige Driving
 bool
 readdir (int fd, char *name) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    return false;
+        return false;
   }
 
   struct file *cur = cur_info->file_temp;
   struct inode *inode = file_get_inode(cur);
 
   if(inode == NULL) {
-    //lock_release(&file_lock);
-    return false;
+        return false;
   }
 
   /* Must read a directory. */
   if (!inode_isdir(inode)) {
-    //lock_release(&file_lock);
-    return false;
+        return false;
   }
 
   /* Skip "." and ".." */
@@ -507,28 +466,24 @@ readdir (int fd, char *name) {
     result = dir_readdir(cur_info->dir_temp, name);
   }
 
-  //lock_release(&file_lock);
   return result;
 }
 
 /* Returns true if fd represents a directory,
 false if it represents an ordinary file.
 */
+// Pengdi Driving
 bool
 isdir (int fd) {
-  //lock_acquire(&file_lock);
-
   struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
     exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   struct inode *inode = file_get_inode(cur);
   bool result = inode_isdir(inode);
-  //lock_release(&file_lock);
 
   return result;
 }
@@ -536,21 +491,18 @@ isdir (int fd) {
 /* Returns the inode number of the inode associated with fd,
 which may represent an ordinary file or a directory.
 */
+// Pengdi Driving
 int
 inumber (int fd) {
-  //lock_acquire(&file_lock);
-
-  struct file_info *cur_info = get_file(fd);
+     struct file_info *cur_info = get_file(fd);
   if (cur_info == NULL) {
     /* No such open file fd for current process. */
-    //lock_release(&file_lock);
-    exit(-1);
+        exit(-1);
   }
 
   struct file *cur = cur_info->file_temp;
   struct inode *inode = file_get_inode(cur);
   int result = (int)inode_get_inumber(inode);
-  //lock_release(&file_lock);
 
   return result;
 }

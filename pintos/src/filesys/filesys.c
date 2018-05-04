@@ -45,6 +45,7 @@ filesys_done (void)
 }
 
 /* Returns the name of file or directory needed in the path. */
+// Peijie Driving
 char *
 get_name(const char *path) {
   char *s = NULL;             /* Temperary string to hold the path */
@@ -90,6 +91,7 @@ filesys_chdir (const char *path) {
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
+// Peijie Driving
 bool
 filesys_create (const char *path, off_t initial_size, bool isdir)
 {
@@ -136,6 +138,7 @@ filesys_create (const char *path, off_t initial_size, bool isdir)
    otherwise.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
+// Peijie Driving
 struct file *
 filesys_open (const char *path)
 {

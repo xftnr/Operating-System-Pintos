@@ -15,8 +15,6 @@ struct file_info
     struct list_elem file_elem;        /* List element for file list. */
 };
 
-struct lock file_lock;        /* Synchronizea calls to file system. */
-
 #endif /* userprog/syscall.h */
 
 /* Process identifier. */
